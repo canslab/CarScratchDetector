@@ -6,15 +6,13 @@
 #include "CarScratchDetector.h"
 #include "CarScratchDetectorDlg.h"
 #include "afxdialogex.h"
-
+#include <opencv2\opencv.hpp>
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #endif
 
 
 // CCarScratchDetectorDlg 대화 상자
-
-
 
 CCarScratchDetectorDlg::CCarScratchDetectorDlg(CWnd* pParent /*=NULL*/)
 	: CDialogEx(IDD_CARSCRATCHDETECTOR_DIALOG, pParent)
@@ -45,6 +43,7 @@ BOOL CCarScratchDetectorDlg::OnInitDialog()
 	SetIcon(m_hIcon, FALSE);		// 작은 아이콘을 설정합니다.
 
 	// TODO: 여기에 추가 초기화 작업을 추가합니다.
+	
 
 	return TRUE;  // 포커스를 컨트롤에 설정하지 않으면 TRUE를 반환합니다.
 }
