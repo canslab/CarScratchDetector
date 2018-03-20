@@ -1,4 +1,4 @@
-#include "stdafx.h"
+#include "..\stdafx.h"
 #include "Timer.h"
 
 void Timer::StartStopWatch()

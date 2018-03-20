@@ -6,7 +6,6 @@
 #include "CarScratchDetector.h"
 #include "CarScratchDetectorDlg.h"
 #include "afxdialogex.h"
-#include <opencv2\opencv.hpp>
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #endif
@@ -23,11 +22,17 @@ CCarScratchDetectorDlg::CCarScratchDetectorDlg(CWnd* pParent /*=NULL*/)
 void CCarScratchDetectorDlg::DoDataExchange(CDataExchange* pDX)
 {
 	CDialogEx::DoDataExchange(pDX);
+	DDX_Control(pDX, IDC_INPUTIMAGEWIDTH, m_imageWidthText);
+	DDX_Control(pDX, IDC_INPUTIMAGEHEIGHT, m_imageHeightText);
 }
 
 BEGIN_MESSAGE_MAP(CCarScratchDetectorDlg, CDialogEx)
 	ON_WM_PAINT()
 	ON_WM_QUERYDRAGICON()
+	ON_BN_CLICKED(IDC_OPENIMAGEFILEBTN, &CCarScratchDetectorDlg::OnBnClickedOpenimagefilebtn)
+	ON_BN_CLICKED(IDC_SHOWBODYPART, &CCarScratchDetectorDlg::OnBnClickedShowbodypart)
+	ON_BN_CLICKED(IDC_RUNBUTTON, &CCarScratchDetectorDlg::OnBnClickedRunbutton)
+	ON_BN_CLICKED(IDC_SAVERESULTBTN, &CCarScratchDetectorDlg::OnBnClickedSaveresultbtn)
 END_MESSAGE_MAP()
 
 
@@ -84,3 +89,67 @@ HCURSOR CCarScratchDetectorDlg::OnQueryDragIcon()
 	return static_cast<HCURSOR>(m_hIcon);
 }
 
+
+#pragma optimize("gpsy", off)
+void CCarScratchDetectorDlg::OnBnClickedOpenimagefilebtn()
+{
+	// TODO: Add your control notification handler code here
+	char szFilter[] = "Image|*.BMP;*.PNG;*.JPG;*.JPEG";
+	CFileDialog dlg(TRUE, NULL, NULL, OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT, szFilter, AfxGetMainWnd());
+	
+	if (dlg.DoModal() == IDOK)
+	{
+		CString cstrImgPath = dlg.GetPathName();
+		if (m_srcMat.rows > 0)
+		{
+			m_srcMat.release();
+		}
+
+		m_srcMat = cv::imread(cv::String(cstrImgPath).c_str());
+		
+		// If input image exists
+		if (m_srcMat.rows > 0)
+		{
+			m_imageWidthText.SetWindowTextA(std::to_string(m_srcMat.cols).c_str());
+			m_imageHeightText.SetWindowTextA(std::to_string(m_srcMat.rows).c_str());
+		}
+		
+		cv::imshow("Input Image", m_srcMat);
+	}
+}
+#pragma optimize("gpsy", on)
+
+
+void CCarScratchDetectorDlg::OnBnClickedShowbodypart()
+{
+	// TODO: Add your control notification handler code here
+}
+
+
+void CCarScratchDetectorDlg::OnBnClickedRunbutton()
+{
+	// TODO: Add your control notification handler code here
+
+}
+
+
+void CCarScratchDetectorDlg::OnBnClickedSaveresultbtn()
+{
+	// TODO: Add your control notification handler code here
+	char szFilter[] = "Image|*.BMP;*.PNG;*.JPG;*.JPEG";
+	
+	if (m_resultMat.rows > 0)
+	{
+		CFileDialog dlg(FALSE, NULL, NULL, OFN_HIDEREADONLY, szFilter, AfxGetMainWnd());
+		if (IDOK == dlg.DoModal())
+		{
+			CString strPathName = dlg.GetPathName();
+			cv::imwrite(cv::String(strPathName) + ".jpg", m_resultMat);
+			MessageBox("Save Complete");
+		}
+	}
+	else
+	{
+		MessageBox("Experiment Result doesn't exist");
+	}	
+}

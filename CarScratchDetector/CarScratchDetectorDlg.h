@@ -3,7 +3,8 @@
 //
 
 #pragma once
-
+#include <opencv2\opencv.hpp>
+#include "afxwin.h"
 
 // CCarScratchDetectorDlg 대화 상자
 class CCarScratchDetectorDlg : public CDialogEx
@@ -25,9 +26,20 @@ public:
 protected:
 	HICON m_hIcon;
 
+	cv::Mat m_srcMat;
+	cv::Mat m_resultMat;
+	
+
 	// 생성된 메시지 맵 함수
 	virtual BOOL OnInitDialog();
 	afx_msg void OnPaint();
 	afx_msg HCURSOR OnQueryDragIcon();
 	DECLARE_MESSAGE_MAP()
+public:
+	afx_msg void OnBnClickedOpenimagefilebtn();
+	afx_msg void OnBnClickedShowbodypart();
+	afx_msg void OnBnClickedRunbutton();
+	CStatic m_imageWidthText;
+	CStatic m_imageHeightText;
+	afx_msg void OnBnClickedSaveresultbtn();
 };
