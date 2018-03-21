@@ -20,10 +20,7 @@ private:
 	// Mean Shift Segmentation 관련 파라미터
 	double m_spatialBandwidth;
 	double m_colorBandwidth;
-
-	// 경계로부터 몇 pixel까지를 배경으로 처리할지.
-	int m_backgroundTolerance;
-
+		
 	// 클러스터 이미지도 만들것인지
 	bool m_bGetClusterImage;
 
@@ -43,10 +40,6 @@ public:
 	{
 		m_colorBandwidth = in_sr;
 	}
-	void SetBackgroundTolerance(int in_tolerance)
-	{
-		m_backgroundTolerance = in_tolerance;
-	}
 	void SetToGetClusterImage(bool in_bSet)
 	{
 		m_bGetClusterImage = in_bSet;
@@ -62,13 +55,12 @@ public:
 		m_lValueDivider = in_lValueDivider;
 		m_spatialBandwidth = in_sp;
 		m_colorBandwidth = in_sr;
-		m_backgroundTolerance = in_backgroundTolerance;
 		m_bGetClusterImage = in_bGetClusterImage;
 		m_bGetMeanShiftSegmentationResult = in_bGetMeanShiftSegmentationResult;
 	}
 	void Reset()
 	{
-		m_lValueDivider = m_spatialBandwidth = m_colorBandwidth = m_backgroundTolerance = m_bGetClusterImage = m_bGetMeanShiftSegmentationResult = 0;
+		m_lValueDivider = m_spatialBandwidth = m_colorBandwidth = m_bGetClusterImage = m_bGetMeanShiftSegmentationResult = 0;
 	}
 public:
 	inline double GetLValueDivider() const
@@ -83,10 +75,7 @@ public:
 	{
 		return m_colorBandwidth;
 	}
-	inline double GetBackgroundTolerance() const
-	{
-		return m_backgroundTolerance;
-	}
+	
 	inline bool IsSetToGetClusterImage() const
 	{
 		return m_bGetClusterImage;
@@ -98,11 +87,11 @@ public:
 
 public:
 	// 피부색도 검출할것인지.. (이건 다른 프로젝트때문에 있는 것..)
-	AlgorithmParameter() :m_spatialBandwidth(8), m_colorBandwidth(8), m_lValueDivider(2.5), m_backgroundTolerance(5), m_bGetClusterImage(false), m_bGetMeanShiftSegmentationResult(false)
+	AlgorithmParameter() :m_spatialBandwidth(8), m_colorBandwidth(8), m_lValueDivider(2.5), m_bGetClusterImage(false), m_bGetMeanShiftSegmentationResult(false)
 	{
 	}
 	AlgorithmParameter(double in_lValueDivider, double in_sp, double in_sr, int in_backgroundTolerance, bool in_bGetClusterImage, bool in_bGetMeanShiftSegmentationResult):
-		m_lValueDivider(in_lValueDivider), m_spatialBandwidth(in_sp), m_colorBandwidth(in_sr), m_backgroundTolerance(in_backgroundTolerance), m_bGetClusterImage(in_bGetClusterImage), m_bGetMeanShiftSegmentationResult(in_bGetMeanShiftSegmentationResult)
+		m_lValueDivider(in_lValueDivider), m_spatialBandwidth(in_sp), m_colorBandwidth(in_sr), m_bGetClusterImage(in_bGetClusterImage), m_bGetMeanShiftSegmentationResult(in_bGetMeanShiftSegmentationResult)
 	{
 
 	}
@@ -206,8 +195,9 @@ private:
 /************************************************************************/
 /**************			Clinet Functions					*************/
 /************************************************************************/
-// Client가 호출할 코드, out_resultImages에 결과들을 받는다. out_resultImages[0] -> 최종결과, out_resultImages[1] -> 민쉬프트 필터링 결과, out_resultImages[2] -> 클러스터링 결과
-bool ExtractObjectFromSourceImage(const cv::Mat& in_srcImage, const AlgorithmParameter& in_parameter, AlgorithmResult& out_finalParameter);
+
+// 입력된 이미지에서, 바디부분만 뽑아낸다.
+bool ExtractCarBody(const cv::Mat& in_srcImage, const AlgorithmParameter& in_parameter, AlgorithmResult& out_finalParameter);
 
 
 /************************************************************************/

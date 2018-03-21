@@ -6,10 +6,12 @@
 #include "CarScratchDetector.h"
 #include "CarScratchDetectorDlg.h"
 #include "afxdialogex.h"
+#include "AlgorithmCode\AlgorithmCollection.h"
+#include "CarNumberRemoveCode\LPdetection.h"
+
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #endif
-
 
 // CCarScratchDetectorDlg 대화 상자
 
@@ -24,6 +26,8 @@ void CCarScratchDetectorDlg::DoDataExchange(CDataExchange* pDX)
 	CDialogEx::DoDataExchange(pDX);
 	DDX_Control(pDX, IDC_INPUTIMAGEWIDTH, m_imageWidthText);
 	DDX_Control(pDX, IDC_INPUTIMAGEHEIGHT, m_imageHeightText);
+	DDX_Control(pDX, IDC_SPATIALRADIUSEDIT, m_spatialRadiusEditBox);
+	DDX_Control(pDX, IDC_COLORRADIUSEDIT, m_colorRadiusEditBox);
 }
 
 BEGIN_MESSAGE_MAP(CCarScratchDetectorDlg, CDialogEx)
@@ -34,8 +38,6 @@ BEGIN_MESSAGE_MAP(CCarScratchDetectorDlg, CDialogEx)
 	ON_BN_CLICKED(IDC_RUNBUTTON, &CCarScratchDetectorDlg::OnBnClickedRunbutton)
 	ON_BN_CLICKED(IDC_SAVERESULTBTN, &CCarScratchDetectorDlg::OnBnClickedSaveresultbtn)
 END_MESSAGE_MAP()
-
-
 // CCarScratchDetectorDlg 메시지 처리기
 
 BOOL CCarScratchDetectorDlg::OnInitDialog()
@@ -47,8 +49,9 @@ BOOL CCarScratchDetectorDlg::OnInitDialog()
 	SetIcon(m_hIcon, TRUE);			// 큰 아이콘을 설정합니다.
 	SetIcon(m_hIcon, FALSE);		// 작은 아이콘을 설정합니다.
 
-	// TODO: 여기에 추가 초기화 작업을 추가합니다.
-	
+	// TODO: 여기에 추가 초기화 작업을 추가합니다.	
+	m_spatialRadiusEditBox.SetWindowTextA("16");
+	m_colorRadiusEditBox.SetWindowTextA("16");
 
 	return TRUE;  // 포커스를 컨트롤에 설정하지 않으면 TRUE를 반환합니다.
 }
@@ -89,14 +92,12 @@ HCURSOR CCarScratchDetectorDlg::OnQueryDragIcon()
 	return static_cast<HCURSOR>(m_hIcon);
 }
 
-
-#pragma optimize("gpsy", off)
 void CCarScratchDetectorDlg::OnBnClickedOpenimagefilebtn()
 {
 	// TODO: Add your control notification handler code here
 	char szFilter[] = "Image|*.BMP;*.PNG;*.JPG;*.JPEG";
 	CFileDialog dlg(TRUE, NULL, NULL, OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT, szFilter, AfxGetMainWnd());
-	
+
 	if (dlg.DoModal() == IDOK)
 	{
 		CString cstrImgPath = dlg.GetPathName();
@@ -106,25 +107,62 @@ void CCarScratchDetectorDlg::OnBnClickedOpenimagefilebtn()
 		}
 
 		m_srcMat = cv::imread(cv::String(cstrImgPath).c_str());
-		
+
+		RemoveNumberPlate(m_srcMat);
+
+		// To reduce the image's resolution.
+		double aspectRatio = (double)m_srcMat.rows / m_srcMat.cols;
+		int resizedWidth = 0, resizedHeight = 0, accValue = 0, totalPixel = 0;
+
+		do
+		{
+			accValue += 10;
+			totalPixel = (int)(accValue * accValue * aspectRatio);
+
+		} while (totalPixel <= 150000);
+
+		resizedWidth = accValue;
+		resizedHeight = aspectRatio * accValue;
+
+		if (resizedWidth <= m_srcMat.cols && resizedHeight <= m_srcMat.rows)
+		{
+			// 이미지 사이즈 조정
+			cv::resize(m_srcMat, m_srcMat, cv::Size(resizedWidth, resizedHeight));
+		}
+
 		// If input image exists
 		if (m_srcMat.rows > 0)
 		{
 			m_imageWidthText.SetWindowTextA(std::to_string(m_srcMat.cols).c_str());
 			m_imageHeightText.SetWindowTextA(std::to_string(m_srcMat.rows).c_str());
 		}
-		
+
 		cv::imshow("Input Image", m_srcMat);
 	}
 }
-#pragma optimize("gpsy", on)
 
-
+#pragma optimize("gpsy", off)
 void CCarScratchDetectorDlg::OnBnClickedShowbodypart()
 {
 	// TODO: Add your control notification handler code here
-}
+	//ExtractCarBody
+	AlgorithmParameter param;
+	AlgorithmResult result;
 
+	CString spatialRadiusString, colorRadiusString;
+	m_spatialRadiusEditBox.GetWindowTextA(spatialRadiusString);
+	m_colorRadiusEditBox.GetWindowTextA(colorRadiusString);
+
+	param.SetSpatialBandwidth(atof(spatialRadiusString));
+	param.SetColorBandwidth(atof(colorRadiusString));
+
+	if (m_srcMat.data != nullptr)
+	{
+		
+		ExtractCarBody(m_srcMat, param, result);
+	}
+}
+#pragma optimize("gpsy", on)
 
 void CCarScratchDetectorDlg::OnBnClickedRunbutton()
 {
@@ -132,12 +170,11 @@ void CCarScratchDetectorDlg::OnBnClickedRunbutton()
 
 }
 
-
 void CCarScratchDetectorDlg::OnBnClickedSaveresultbtn()
 {
 	// TODO: Add your control notification handler code here
 	char szFilter[] = "Image|*.BMP;*.PNG;*.JPG;*.JPEG";
-	
+
 	if (m_resultMat.rows > 0)
 	{
 		CFileDialog dlg(FALSE, NULL, NULL, OFN_HIDEREADONLY, szFilter, AfxGetMainWnd());
@@ -151,5 +188,5 @@ void CCarScratchDetectorDlg::OnBnClickedSaveresultbtn()
 	else
 	{
 		MessageBox("Experiment Result doesn't exist");
-	}	
+	}
 }

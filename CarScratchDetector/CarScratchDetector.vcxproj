@@ -187,20 +187,24 @@
     <Text Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="AlgorithmCollection.h" />
+    <ClInclude Include="AlgorithmCode\AlgorithmCollection.h" />
+    <ClInclude Include="AlgorithmCode\Cluster.h" />
+    <ClInclude Include="CarNumberRemoveCode\ConnectedComponent.h" />
+    <ClInclude Include="CarNumberRemoveCode\LPdetection.h" />
     <ClInclude Include="CarScratchDetector.h" />
     <ClInclude Include="CarScratchDetectorDlg.h" />
-    <ClInclude Include="Cluster.h" />
     <ClInclude Include="Resource.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="targetver.h" />
     <ClInclude Include="UtilityCode\Timer.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="AlgorithmCollection.cpp" />
+    <ClCompile Include="AlgorithmCode\AlgorithmCollection.cpp" />
+    <ClCompile Include="AlgorithmCode\Cluster.cpp" />
+    <ClCompile Include="CarNumberRemoveCode\ConnectedComponent.cpp" />
+    <ClCompile Include="CarNumberRemoveCode\LPdetection.cpp" />
     <ClCompile Include="CarScratchDetector.cpp" />
     <ClCompile Include="CarScratchDetectorDlg.cpp" />
-    <ClCompile Include="Cluster.cpp" />
     <ClCompile Include="stdafx.cpp" />
     <ClCompile Include="UtilityCode\Timer.cpp" />
   </ItemGroup>

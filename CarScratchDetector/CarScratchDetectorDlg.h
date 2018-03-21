@@ -42,4 +42,6 @@ public:
 	CStatic m_imageWidthText;
 	CStatic m_imageHeightText;
 	afx_msg void OnBnClickedSaveresultbtn();
+	CEdit m_spatialRadiusEditBox;
+	CEdit m_colorRadiusEditBox;
 };

@@ -15,6 +15,21 @@ private:
 	std::vector<int> m_labels;
 
 public:
+	cv::Point2d GetCenterPoint() const
+	{
+		cv::Point2d centerPoint(0, 0);
+
+		for (auto& eachPoint : m_pointsArray)
+		{
+			centerPoint.x += eachPoint.x;
+			centerPoint.y += eachPoint.y;
+		}
+		centerPoint.x /= (double)m_pointsArray.size();
+		centerPoint.y /= (double)m_pointsArray.size();
+
+		return centerPoint;
+	}
+
 	// 클러스터를 바운딩하는 사각형
 	cv::Rect m_boundedBox;
 
@@ -55,7 +70,6 @@ public:
 			return true;
 		}
 	}
-
 
 public:
 	void SetColorUsingLuvVector(const cv::Vec3b& in_luvColorVector)
@@ -121,6 +135,7 @@ public:
 		m_pointsArray = in_cluster.m_pointsArray;	// 이렇게 대입만 해도 Deep Copy가 발생함.
 
 		this->m_colorInLuv = in_cluster.m_colorInLuv;
+		this->m_colorInHSV = in_cluster.m_colorInHSV;
 		this->m_boundedBox = cv::Rect(in_rect.x, in_rect.y, in_rect.width, in_rect.height);
 		this->m_labels = in_cluster.m_labels;
 		return *this;
@@ -131,6 +146,7 @@ public:
 	{
 		m_pointsArray = in_cluster.m_pointsArray;
 		this->m_colorInLuv = in_cluster.m_colorInLuv;
+		this->m_colorInHSV = in_cluster.m_colorInHSV;
 		this->m_boundedBox = in_cluster.m_boundedBox;
 		this->m_labels = in_cluster.m_labels;
 	}
@@ -148,6 +164,7 @@ public:
 		m_pointsArray.insert(m_pointsArray.end(), in_cluster.m_pointsArray.begin(), in_cluster.m_pointsArray.end());
 		this->m_boundedBox = this->m_boundedBox | in_cluster.m_boundedBox;
 		this->m_colorInLuv = (in_cluster.m_colorInLuv + this->m_colorInLuv) / 2;
+		this->m_colorInHSV = (in_cluster.m_colorInHSV + this->m_colorInHSV) / 2;
 		this->m_labels.insert((this->m_labels).begin(), in_cluster.m_labels.begin(), in_cluster.m_labels.end());
 	}
 };
