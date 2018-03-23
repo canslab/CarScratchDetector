@@ -87,7 +87,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
     <IncludePath>$(ProjectDir)\OpenCV34\include;$(IncludePath)</IncludePath>
-    <LibraryPath>$(ProjectDir)\OpenCV34\x64\vc14\lib;$(LibraryPath)</LibraryPath>
+    <LibraryPath>$(ProjectDir)\OpenCV34\lib;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
