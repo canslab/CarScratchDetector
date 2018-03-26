@@ -141,7 +141,6 @@ void CCarScratchDetectorDlg::OnBnClickedOpenimagefilebtn()
 	}
 }
 
-#pragma optimize("gpsy", off)
 void CCarScratchDetectorDlg::OnBnClickedShowbodypart()
 {
 	// TODO: Add your control notification handler code here
@@ -158,11 +157,9 @@ void CCarScratchDetectorDlg::OnBnClickedShowbodypart()
 
 	if (m_srcMat.data != nullptr)
 	{
-		
 		ExtractCarBody(m_srcMat, param, result);
 	}
 }
-#pragma optimize("gpsy", on)
 
 void CCarScratchDetectorDlg::OnBnClickedRunbutton()
 {

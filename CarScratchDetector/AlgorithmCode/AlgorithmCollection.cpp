@@ -136,6 +136,7 @@ void PerformClustering(cv::Mat& in_luvWholeImage, const cv::Rect& in_ROI, int in
 	roi.width = in_luvWholeImage.cols;
 	roi.height = in_luvWholeImage.rows;
 	int clusterIndex = 0;
+	int currentClusterMagnitude = 0;
 
 	for (int y = in_ROI.y; y < (in_ROI.y + in_ROI.height); ++y)
 	{
@@ -156,14 +157,15 @@ void PerformClustering(cv::Mat& in_luvWholeImage, const cv::Rect& in_ROI, int in
 				afterFloodFillMask.copyTo(beforeFloodFillMask);
 
 				cv::Mat roiMat = subtractedMatrix(roi);
+				currentClusterMagnitude = cv::sum(roiMat)[0];
 
-				// 클러스터를 이루는 점들의 위치를 findIndexColumnVector가 가지고 있음
-				cv::findNonZero(roiMat, findIndexColumnVector);
-
-				int nPointsInThisCluster = findIndexColumnVector.rows;
+				//int nPointsInThisCluster = findIndexColumnVector.rows;
 				// if # of elements in a cluster is less than a certian number (0.5% of total number of pixels), -1 is assigned to that pixel
-				if (nPointsInThisCluster > in_thresholdToBeCluster)
+				if (currentClusterMagnitude > in_thresholdToBeCluster)
 				{
+					// 클러스터를 이루는 점들의 위치를 findIndexColumnVector가 가지고 있음
+					cv::findNonZero(roiMat, findIndexColumnVector);
+
 					// label map 만들기
 					for (int i = 0; i < findIndexColumnVector.rows; ++i)
 					{
@@ -191,8 +193,8 @@ void PerformClustering(cv::Mat& in_luvWholeImage, const cv::Rect& in_ROI, int in
 			}
 		}
 	}
-
 }
+
 void FindSeedClusterInROI(const cv::Mat & in_labelMap, const std::set<int> &in_backgroundIndices, const cv::Rect & in_ROI, int& out_seedLabel)
 {
 	int startRowIndex = in_ROI.y;
@@ -829,39 +831,24 @@ static int FindMaxIndexInArray(std::vector<T> &in_vector, int in_totalSize)
 /*****************************************************/
 /****      For Client Function Implementation    *****/
 /*****************************************************/
-#pragma optimize("gpsy", off)
 bool ExtractCarBody(const cv::Mat & in_srcImage, const AlgorithmParameter& in_parameter, AlgorithmResult& out_result)
 {
-	Timer totalTimer;
-	Timer partialTimer;
 	cv::Mat filteredImageMat_luv;												// 원본이미지의 민 쉬프트 필터링된 버젼
 	cv::Mat originalImage;														// 원본이미지
-	cv::Mat segmentedImage;														// 민 쉬프트 세그멘테이션 결과 이미지
-	cv::Mat hsvOriginalImageMat;												// 원본이미지의 HSV format
 	cv::Mat luvOriginalImageMat;												// 원본이미지의 LUV format
 
 	in_srcImage.copyTo(originalImage);											// 입력받은 이미지를 deep copy해옴.
-	cv::cvtColor(originalImage, hsvOriginalImageMat, CV_BGR2HSV);				// 원본이미지 Color Space 변환 (BGR -> Hsv)
 	cv::cvtColor(originalImage, luvOriginalImageMat, CV_BGR2Luv);				// 원본이미지 Color Space 변환 (BGR -> Luv)
-	out_result.SetElapsedTime(AlgorithmResult::TimerIdentifier::BGRToLuvElapsedTime, partialTimer.EndStopWatch());
 
 	const int kOriginalImageWidth = originalImage.cols;							// 원본 사진의 너비
 	const int kOriginalImageHeight = originalImage.rows;						// 원본 사진의 높이
-	const int kCenterX = kOriginalImageWidth / 2;								// ROI의 중앙 좌표(x)
-	const int kCenterY = kOriginalImageHeight / 2;								// ROI의 중앙 좌표(y)
-	const int kROI_RectWidth = kOriginalImageWidth / 3;							// ROI 초기 너비
-	const int kROI_RectHeight = kOriginalImageHeight / 3;						// ROI 초기 높이
-	const cv::Rect kROI_Rect(kCenterX - (kROI_RectWidth / 2), kCenterY - (kROI_RectHeight / 2), kROI_RectWidth, kROI_RectHeight); // ROI 생성
+	cv::Point2d imageCenter(kOriginalImageWidth / 2, kOriginalImageHeight / 2);
 
 	double sp = in_parameter.GetSpatialBandwidth();								// Mean Shift Filtering을 위한 spatial radius
 	double sr = in_parameter.GetColorBandwidth();								// Mean Shift Filtering을 위한 range (color) radius
 
 	std::unordered_map<int, Cluster> clusters; 									// Cluster 모음, Key = Label, Value = Cluster
 	cv::Mat labelMap;															// 레이블맵
-
-	int maxLabel = -1;
-	const int kTotalIteration = 5;
-
 
 	////////////////////////////////////////////////////////////////////
 	//							                                      //
@@ -879,7 +866,6 @@ bool ExtractCarBody(const cv::Mat & in_srcImage, const AlgorithmParameter& in_pa
 	std::vector<double> candidateClusterWeights(kNumberOfCandidateClusters);
 	std::vector<double> candidateClusterScores(kNumberOfCandidateClusters);
 
-	// Get Top 3 Clusters in terms of the number of elements of each each cluster
 	// 규모가 큰 #(kNumberOfCandidateClusters)개의 클러스터 레이블을 취득한다.
 	for (const auto& eachCluster : clusters)
 	{
@@ -891,7 +877,6 @@ bool ExtractCarBody(const cv::Mat & in_srcImage, const AlgorithmParameter& in_pa
 		{
 			if (currentSize > clusters[candidateClusterLabels[i]].GetTotalPoints())
 			{
-				// move one by one until i becomes 2
 				while (i <= (kNumberOfCandidateClusters - 1))
 				{
 					int temp = candidateClusterLabels[i];
@@ -904,9 +889,8 @@ bool ExtractCarBody(const cv::Mat & in_srcImage, const AlgorithmParameter& in_pa
 		}
 	}
 
-	cv::Point2d imageCenter(kCenterX, kCenterY);
-	auto largerLength = (kOriginalImageWidth > kOriginalImageHeight) ? kOriginalImageWidth : kOriginalImageHeight;
-	const double expCoefficient = -12.5 / pow(largerLength, 2);
+	auto smallerLength = (kOriginalImageWidth < kOriginalImageHeight) ? kOriginalImageWidth : kOriginalImageHeight;
+	const double expCoefficient = -12.5 / pow(smallerLength, 2);
 
 	for (int i = 0; i < kNumberOfCandidateClusters; ++i)
 	{
@@ -982,4 +966,3 @@ bool ExtractCarBody(const cv::Mat & in_srcImage, const AlgorithmParameter& in_pa
 
 	return true;
 }
-#pragma optimize("gpsy", on)
