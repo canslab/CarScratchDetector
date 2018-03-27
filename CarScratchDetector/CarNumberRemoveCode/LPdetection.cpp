@@ -4,7 +4,7 @@
 
 // 함수 설명 : 클래스 생성자
 // 리턴 : 없음
-LPdetection::LPdetection(void)
+LPdetection::LPdetection(void) :toBeRemovedRegionWhite(0)
 {
 }
 
@@ -22,7 +22,7 @@ bool LPdetection::inSameLP(
 	CConnectedComponent &a,			// 연속한 숫자인지 판단할 두 CC중 하나
 	CConnectedComponent &b,			// 연속한 숫자인지 판단할 두 CC중 하나
 	bool isGreen					// 연속한 숫자인지 판단할 번호판이 녹색 번호판인지, 흰색번호판인지 가리키는 flag. true면 녹색, false면 흰색.
-	)
+)
 {
 	bool Hoverlap = false;
 	bool SimilarHeight = false;
@@ -30,7 +30,7 @@ bool LPdetection::inSameLP(
 	bool SimilarScale = false;
 
 	int maxh = 0, minh = 0;
-	if (a.height>b.height)
+	if (a.height > b.height)
 	{
 		maxh = a.height;
 		minh = b.height;
@@ -49,7 +49,7 @@ bool LPdetection::inSameLP(
 	}
 
 	// 비슷한 높이를 가지는지 확인
-	if ((double)maxh / (double)minh <1.1)
+	if ((double)maxh / (double)minh < 1.1)
 	{
 		SimilarHeight = true;
 	}
@@ -84,11 +84,12 @@ bool LPdetection::inSameLP(
 }
 
 
+#pragma optimize("gpsy", off)
 // 함수 설명 : 주어진 영상에서 녹색 번호판을 detection한 후 detection된 번호판들을 crop하여 그 영상들을 vector array로 출력한다.
 // 리턴 : 검출된 번호판들을 각각 crop하고 정면시점으로 warping한 결과영상들을 저장한 vector array
 bool LPdetection::GreenLPdetection(
 	IplImage* src			// 번호판을 검출할 대상이 되는 입력 영상
-	)
+)
 {
 	green_point.clear();
 	int height = src->height;
@@ -111,11 +112,11 @@ bool LPdetection::GreenLPdetection(
 
 
 	// DoG 분석을 통해 edge에 해당하는 픽셀을 binary map으로 추출
-	for (int h = 0; h<src->height; h++)
+	for (int h = 0; h < src->height; h++)
 	{
-		for (int w = 0; w<src->width; w++)
+		for (int w = 0; w < src->width; w++)
 		{
-			if (wblur1[h][w] - wblur2[h][w]<0)
+			if (wblur1[h][w] - wblur2[h][w] < 0)
 				wbinary1[h][w] = 255;
 		}
 	}
@@ -139,12 +140,15 @@ bool LPdetection::GreenLPdetection(
 
 
 	std::vector<int> temp;
-	for (int i = 0; i<CarNum.size(); i++) temp.push_back(i);
+	for (int i = 0; i < CarNum.size(); i++)
+	{
+		temp.push_back(i);
+	}
 
-	for (int i = 0; i<CarNum.size(); i++)
+	for (int i = 0; i < CarNum.size(); i++)
 	{
 		// 인접한 4개의 번호에 해당하는 CC들을 추출하여 저장(번호판의 4자리 숫자)
-		for (int j = i + 1; j<CarNum.size(); j++)
+		for (int j = i + 1; j < CarNum.size(); j++)
 		{
 			bool sameLP = false;
 			sameLP = inSameLP(CarNum[i], CarNum[j], true);
@@ -164,7 +168,7 @@ bool LPdetection::GreenLPdetection(
 				else if (temp[i] == -1 && temp[j] != j)
 				{
 					temp[i] = temp[j];
-					for (int k = 0; k<CarNum.size(); k++)
+					for (int k = 0; k < CarNum.size(); k++)
 					{
 						if (temp[k] == i)
 						{
@@ -183,11 +187,11 @@ bool LPdetection::GreenLPdetection(
 
 				else if (temp[i] != i && temp[j] != j && temp[i] != temp[j])
 				{
-					if (temp[i]<temp[j])
+					if (temp[i] < temp[j])
 					{
 						temp[temp[j]] = temp[i];
 						int m = temp[j];
-						for (int k = 0; k<CarNum.size(); k++)
+						for (int k = 0; k < CarNum.size(); k++)
 						{
 							if (temp[k] == m)
 								temp[k] = temp[i];
@@ -197,7 +201,7 @@ bool LPdetection::GreenLPdetection(
 					{
 						temp[temp[i]] = temp[j];
 						int m = temp[i];
-						for (int k = 0; k<CarNum.size(); k++)
+						for (int k = 0; k < CarNum.size(); k++)
 						{
 							if (temp[k] == m)
 								temp[k] = temp[j];
@@ -210,13 +214,13 @@ bool LPdetection::GreenLPdetection(
 	}
 
 
-	for (int i = 0; i<CarNum.size(); i++)
+	for (int i = 0; i < CarNum.size(); i++)
 	{
 		std::vector<CConnectedComponent> a;
 		if (temp[i] == -1)
 		{
 			a.push_back(CarNum[i]);
-			for (int j = i + 1; j<CarNum.size(); j++)
+			for (int j = i + 1; j < CarNum.size(); j++)
 			{
 				if (temp[j] == i)
 				{
@@ -234,13 +238,13 @@ bool LPdetection::GreenLPdetection(
 
 			for (std::vector<CConnectedComponent>::iterator iter = a.begin(); iter != a.end(); ++iter)
 			{
-				if (min_x>(*iter).ld.x)
+				if (min_x > (*iter).ld.x)
 				{
 					min_x = (*iter).ld.x;
 					bb = (*iter);
 					min_center_x = (*iter).center.x;
 				}
-				if (max_x<(*iter).rd.x)
+				if (max_x < (*iter).rd.x)
 				{
 					max_x = (*iter).rd.x;
 					cc = (*iter);
@@ -257,6 +261,11 @@ bool LPdetection::GreenLPdetection(
 			Point2f RD(max_x, lineBA*max_x + lineBB);
 			Point2f LU(min_x, lineTA*min_x + lineTB);
 			Point2f RU(max_x, lineTA*max_x + lineTB);
+
+			toBeRemovedRegionGreen.push_back(LU);
+			toBeRemovedRegionGreen.push_back(LD);
+			toBeRemovedRegionGreen.push_back(RD);
+			toBeRemovedRegionGreen.push_back(RU);
 
 			green_point.push_back(min_x);
 			green_point.push_back(lineTA*min_x + lineTB);
@@ -276,13 +285,14 @@ bool LPdetection::GreenLPdetection(
 
 	return green_alarm;
 }
-
+#pragma optimize("gpsy", on)
 
 // 함수 설명 : 주어진 영상에서 흰색 번호판을 detection한 후 detection된 번호판들을 crop하여 그 영상들을 vector array로 출력한다.
 // 리턴 : 검출된 번호판들을 각각 crop하고 정면시점으로 warping한 결과영상들을 저장한 vector array
+#pragma optimize("gpsy", off)
 bool LPdetection::WhiteLPdetection(
 	IplImage* src					// 번호판을 검출할 대상이 되는 입력 영상
-	)
+)
 {
 	white_point.clear();
 	int height = src->height;
@@ -300,9 +310,9 @@ bool LPdetection::WhiteLPdetection(
 	cvSmooth(src, blur2, CV_BLUR, 11, 11);
 	cvSmooth(src, blur3, CV_BLUR, 41, 41);
 
-	for (int h = 0; h<src->height; h++)
+	for (int h = 0; h < src->height; h++)
 	{
-		for (int w = 0; w<src->width; w++)
+		for (int w = 0; w < src->width; w++)
 		{
 			if (wblur1[h][w] - wblur2[h][w]<0 && abs(wblur2[h][w] - wsrc[h][w]) > 0.01 * 255)
 				wbinary[h][w] = 255;
@@ -314,11 +324,11 @@ bool LPdetection::WhiteLPdetection(
 	std::vector<CConnectedComponent> CarNum = CConnectedComponent::CCFiltering(cvarrToMat(binary), object_color, background_color);
 
 	std::vector<int> temp;
-	for (int i = 0; i<CarNum.size(); i++) temp.push_back(i);
+	for (int i = 0; i < CarNum.size(); i++) temp.push_back(i);
 
-	for (int i = 0; i<CarNum.size(); i++)
+	for (int i = 0; i < CarNum.size(); i++)
 	{
-		for (int j = i + 1; j<CarNum.size(); j++)
+		for (int j = i + 1; j < CarNum.size(); j++)
 		{
 			bool sameLP = false;
 			sameLP = inSameLP(CarNum[i], CarNum[j], false);
@@ -338,7 +348,7 @@ bool LPdetection::WhiteLPdetection(
 				else if (temp[i] == -1 && temp[j] != j)
 				{
 					temp[i] = temp[j];
-					for (int k = 0; k<CarNum.size(); k++)
+					for (int k = 0; k < CarNum.size(); k++)
 					{
 						if (temp[k] == i)
 						{
@@ -357,11 +367,11 @@ bool LPdetection::WhiteLPdetection(
 
 				else if (temp[i] != i && temp[j] != j && temp[i] != temp[j])
 				{
-					if (temp[i]<temp[j])
+					if (temp[i] < temp[j])
 					{
 						temp[temp[j]] = temp[i];
 						int m = temp[j];
-						for (int k = 0; k<CarNum.size(); k++)
+						for (int k = 0; k < CarNum.size(); k++)
 						{
 							if (temp[k] == m)
 								temp[k] = temp[i];
@@ -371,7 +381,7 @@ bool LPdetection::WhiteLPdetection(
 					{
 						temp[temp[i]] = temp[j];
 						int m = temp[i];
-						for (int k = 0; k<CarNum.size(); k++)
+						for (int k = 0; k < CarNum.size(); k++)
 						{
 							if (temp[k] == m)
 								temp[k] = temp[j];
@@ -384,13 +394,13 @@ bool LPdetection::WhiteLPdetection(
 	}
 
 
-	for (int i = 0; i<CarNum.size(); i++)
+	for (int i = 0; i < CarNum.size(); i++)
 	{
 		std::vector<CConnectedComponent> a;
 		if (temp[i] == -1)
 		{
 			a.push_back(CarNum[i]);
-			for (int j = i + 1; j<CarNum.size(); j++)
+			for (int j = i + 1; j < CarNum.size(); j++)
 			{
 				if (temp[j] == i)
 				{
@@ -398,7 +408,7 @@ bool LPdetection::WhiteLPdetection(
 				}
 			}
 		}
-		
+
 
 		if (a.size() == 4)
 		{
@@ -407,13 +417,13 @@ bool LPdetection::WhiteLPdetection(
 
 			for (std::vector<CConnectedComponent>::iterator iter = a.begin(); iter != a.end(); ++iter)
 			{
-				if (min_x>(*iter).ld.x)
+				if (min_x > (*iter).ld.x)
 				{
 					min_x = (*iter).ld.x;
 					bb = (*iter);
 
 				}
-				if (max_x<(*iter).rd.x)
+				if (max_x < (*iter).rd.x)
 				{
 					max_x = (*iter).rd.x;
 					cc = (*iter);
@@ -425,17 +435,21 @@ bool LPdetection::WhiteLPdetection(
 			lineEstimate(a, lineTA, lineTB, lineBA, lineBB);
 
 			//번호판 4개 좌표
-
+			Point2f LU(min_x, lineTA*min_x + lineTB);
 			Point2f LD(min_x, lineBA*min_x + lineBB);
 			Point2f RD(max_x, lineBA*max_x + lineBB);
-			Point2f LU(min_x, lineTA*min_x + lineTB);
 			Point2f RU(max_x, lineTA*max_x + lineTB);
+
+			toBeRemovedRegionWhite.push_back(LU);
+			toBeRemovedRegionWhite.push_back(LD);
+			toBeRemovedRegionWhite.push_back(RD);
+			toBeRemovedRegionWhite.push_back(RU);
 
 			white_point.push_back(min_x);
 			white_point.push_back(lineTA*min_x + lineTB);
 			white_point.push_back(max_x);
 			white_point.push_back(lineBA*max_x + lineBB);
-			
+
 			white_alarm = true;
 		}
 	}
@@ -447,6 +461,7 @@ bool LPdetection::WhiteLPdetection(
 
 	return white_alarm;
 }
+#pragma optimize("gpsy", on)
 
 // 함수 설명 : 주어진 영상에서 번호판을 detection한 후 detection된 번호판들을 crop하여 그 영상들을 vector array로 출력한다.
 //			   mask image를 통해 ROI를 설정할 경우 ROI외의 영역을 전부 0으로 만들어 계산량을 줄일 수 있다.
@@ -456,9 +471,9 @@ bool LPdetection::WhiteLPdetection(
 //		  번호판 타입은 녹색인지 흰색인지를 숫자로 표시한다(1 : 흰색, 3 : 녹색)
 void LPdetection::run(
 	Mat src					// 번호판을 검출할 대상이 되는 입력 영상
-	// Mat()을 넣어주는 경우 ROI를 전체로 설정한 것으로 취급
-	// mask Image가 0의 값을 갖는 영역은 입력 영상도 0으로 만들어 검출 영역에서 제외한다.
-	)
+							// Mat()을 넣어주는 경우 ROI를 전체로 설정한 것으로 취급
+							// mask Image가 0의 값을 갖는 영역은 입력 영상도 0으로 만들어 검출 영역에서 제외한다.
+)
 {
 	Mat graySrc;
 	if (src.channels() == 3)
@@ -483,7 +498,7 @@ void LPdetection::lineEstimate(
 	double &lineTB,							// 윗부분을 잇는 직선의 y절편
 	double &lineBA,							// 아랫부분을 잇는 직선의 기울기
 	double &lineBB							// 아랫부분을 잇는 직선의 y절편
-	)
+)
 {
 	Mat sysTX(a.size(), 2, CV_32FC1);
 	Mat sysTY(a.size(), 1, CV_32FC1);
@@ -522,7 +537,7 @@ Mat LPdetection::rectifyImage(
 	Mat src,				// 번호판이 검출된 입력영상
 	CQuad quad,				// 번호판의 네개의 연속된 숫자를 둘러싸는 최소의 사각형 꼭지점 좌표들
 	int type				// 녹색 영상에서 검출되었으면 3, 흰색 영상에서 검출되었으면 1
-	)
+)
 {
 	Point2f from[4];
 	from[0].x = quad.m_LU.x;
@@ -586,12 +601,12 @@ Mat LPdetection::rectifyImage(
 
 	return plateImg;
 }
-
 void RemoveNumberPlate(cv::Mat in_srcImage)
 {
 	LPdetection LPdetectionInst;
 	bool bShouldBeRemoved = false;
 	float lx, ly, rx, ry = 0;
+	std::vector<std::vector<cv::Point2i>> area;
 
 	LPdetectionInst.run(in_srcImage);
 
@@ -602,6 +617,8 @@ void RemoveNumberPlate(cv::Mat in_srcImage)
 		ly = LPdetectionInst.white_point.at(1);
 		rx = LPdetectionInst.white_point.at(2);
 		ry = LPdetectionInst.white_point.at(3);
+
+		area.push_back(LPdetectionInst.toBeRemovedRegionWhite);
 		bShouldBeRemoved = true;
 	}
 
@@ -612,6 +629,8 @@ void RemoveNumberPlate(cv::Mat in_srcImage)
 		ly = LPdetectionInst.white_point.at(1);
 		rx = LPdetectionInst.white_point.at(2);
 		ry = LPdetectionInst.white_point.at(3);
+		area.push_back(LPdetectionInst.toBeRemovedRegionWhite);
+
 		bShouldBeRemoved = true;
 	}
 
@@ -622,12 +641,14 @@ void RemoveNumberPlate(cv::Mat in_srcImage)
 		ly = LPdetectionInst.green_point.at(1);
 		rx = LPdetectionInst.green_point.at(2);
 		ry = LPdetectionInst.green_point.at(3);
+		area.push_back(LPdetectionInst.toBeRemovedRegionGreen);
 		bShouldBeRemoved = true;
 	}
 
 	if (bShouldBeRemoved)
 	{
-		Rect roi(int(lx), int(ly), int(rx - lx), int(ry - ly));
-		in_srcImage(roi) = 0;
+		cv::drawContours(in_srcImage, area, 0, cv::Scalar(0, 0, 0), CV_FILLED, 8);
+		//Rect roi(int(lx), int(ly), int(rx - lx), int(ry - ly));
+		//in_srcImage(roi) = 0;
 	}
 }

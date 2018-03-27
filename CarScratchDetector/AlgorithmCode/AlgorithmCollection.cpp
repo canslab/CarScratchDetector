@@ -836,19 +836,17 @@ bool ExtractCarBody(const cv::Mat & in_srcImage, const AlgorithmParameter& in_pa
 	cv::Mat filteredImageMat_luv;												// 원본이미지의 민 쉬프트 필터링된 버젼
 	cv::Mat originalImage;														// 원본이미지
 	cv::Mat luvOriginalImageMat;												// 원본이미지의 LUV format
-
+	cv::Mat labelMap;															// 레이블맵
+	
 	in_srcImage.copyTo(originalImage);											// 입력받은 이미지를 deep copy해옴.
 	cv::cvtColor(originalImage, luvOriginalImageMat, CV_BGR2Luv);				// 원본이미지 Color Space 변환 (BGR -> Luv)
 
-	const int kOriginalImageWidth = originalImage.cols;							// 원본 사진의 너비
-	const int kOriginalImageHeight = originalImage.rows;						// 원본 사진의 높이
-	cv::Point2d imageCenter(kOriginalImageWidth / 2, kOriginalImageHeight / 2);
+	cv::Point2d imageCenter(originalImage.cols / 2, originalImage.rows / 2);
 
 	double sp = in_parameter.GetSpatialBandwidth();								// Mean Shift Filtering을 위한 spatial radius
 	double sr = in_parameter.GetColorBandwidth();								// Mean Shift Filtering을 위한 range (color) radius
 
 	std::unordered_map<int, Cluster> clusters; 									// Cluster 모음, Key = Label, Value = Cluster
-	cv::Mat labelMap;															// 레이블맵
 
 	////////////////////////////////////////////////////////////////////
 	//							                                      //
@@ -857,10 +855,11 @@ bool ExtractCarBody(const cv::Mat & in_srcImage, const AlgorithmParameter& in_pa
 	////////////////////////////////////////////////////////////////////
 	// Mean Shift Filtering 코드 (OpenCV)
 	cv::pyrMeanShiftFiltering(luvOriginalImageMat, filteredImageMat_luv, sp, sr);
-	int minThresholdToBeCluster = (int)(kOriginalImageHeight * kOriginalImageWidth * 0.02);
-	PerformClustering(filteredImageMat_luv, cv::Rect(0, 0, kOriginalImageWidth, kOriginalImageHeight), minThresholdToBeCluster, labelMap, clusters);
+	int minThresholdToBeCluster = (int)(originalImage.rows * originalImage.cols * 0.02);
+	PerformClustering(filteredImageMat_luv, cv::Rect(0, 0, originalImage.cols, originalImage.rows), minThresholdToBeCluster, labelMap, clusters);
 
 	const int kNumberOfCandidateClusters = 4;
+	const int kNumberOfRandomSamples = (minThresholdToBeCluster < 200) ? minThresholdToBeCluster : 200;
 	std::vector<int> candidateClusterLabels(kNumberOfCandidateClusters);
 	std::vector<double> candidateClusterMagnitudes(kNumberOfCandidateClusters);
 	std::vector<double> candidateClusterWeights(kNumberOfCandidateClusters);
@@ -877,6 +876,7 @@ bool ExtractCarBody(const cv::Mat & in_srcImage, const AlgorithmParameter& in_pa
 		{
 			if (currentSize > clusters[candidateClusterLabels[i]].GetTotalPoints())
 			{
+				// move one by one until i becomes 2
 				while (i <= (kNumberOfCandidateClusters - 1))
 				{
 					int temp = candidateClusterLabels[i];
@@ -889,13 +889,27 @@ bool ExtractCarBody(const cv::Mat & in_srcImage, const AlgorithmParameter& in_pa
 		}
 	}
 
-	auto smallerLength = (kOriginalImageWidth < kOriginalImageHeight) ? kOriginalImageWidth : kOriginalImageHeight;
-	const double expCoefficient = -12.5 / pow(smallerLength, 2);
+	auto largerLength = (originalImage.cols > originalImage.rows) ? originalImage.cols : originalImage.rows;
+	const double expCoefficient = -12.5 / pow(largerLength, 2);
 
 	for (int i = 0; i < kNumberOfCandidateClusters; ++i)
 	{
-		candidateClusterMagnitudes[i] = clusters[candidateClusterLabels[i]].GetTotalPoints();
-		candidateClusterWeights[i] = exp(expCoefficient * pow(cv::norm(clusters[candidateClusterLabels[i]].GetCenterPoint() - imageCenter), 2));
+		Cluster& currentCandidateCluster = clusters[candidateClusterLabels[i]];
+		int currentCandidateClusterSize = currentCandidateCluster.GetTotalPoints();
+		const auto& currentCandidateClusterPoints = currentCandidateCluster.GetPointsArray();
+
+		candidateClusterMagnitudes[i] = currentCandidateClusterSize;
+
+		double averageDistanceFromCenter = 0.0;
+		// weight를 계산할 때, 클러스터에 속하는 픽셀을 random하게 몇 점 샘플링한다.
+		for (int sampleIndex = 0; sampleIndex < kNumberOfRandomSamples; ++sampleIndex)
+		{
+			cv::Point2d tempPoint = currentCandidateClusterPoints[std::rand() % currentCandidateClusterSize];
+			averageDistanceFromCenter += cv::norm(tempPoint - imageCenter);
+		}
+		averageDistanceFromCenter /= kNumberOfRandomSamples;
+
+		candidateClusterWeights[i] = exp(expCoefficient * pow(averageDistanceFromCenter, 2));
 		candidateClusterScores[i] = candidateClusterWeights[i] * candidateClusterMagnitudes[i];
 	}
 
@@ -905,7 +919,7 @@ bool ExtractCarBody(const cv::Mat & in_srcImage, const AlgorithmParameter& in_pa
 
 	cv::cvtColor(filteredImageMat_luv, filteredImageInBGR, CV_Luv2BGR);
 	cv::cvtColor(filteredImageInBGR, filteredImageInHSV, CV_BGR2HSV);
-	cv::imshow("Filtered Image", filteredImageInBGR);
+	
 #endif
 
 	/////////////////////////////////
@@ -963,6 +977,29 @@ bool ExtractCarBody(const cv::Mat & in_srcImage, const AlgorithmParameter& in_pa
 	}
 
 	DrawOuterContourOfCluster(originalImage, seedCluster, cv::Scalar(255, 255, 0));
+	cv::imshow("Contour Image", originalImage);
 
+	cv::Mat hsvPlanes[3];
+	cv::Mat LUVPlanes[3];
+	cv::split(filteredImageMat_luv, LUVPlanes);
+	cv::split(filteredImageInHSV, hsvPlanes);
+
+	cv::Mat colorMapOfHue;
+	cv::applyColorMap(hsvPlanes[0], colorMapOfHue, COLORMAP_HOT);
+	cv::imshow("Hue Distribution", colorMapOfHue);
+
+	
+	cv::Mat colorMapOfLuminance;
+	cv::applyColorMap(LUVPlanes[0], colorMapOfLuminance, COLORMAP_HOT);
+	cv::imshow("L Distribution", colorMapOfLuminance);
+
+	cv::Mat colorLabelMap;
+	cv::normalize(labelMap, colorLabelMap, 0, 255, NORM_MINMAX);
+	colorLabelMap.convertTo(colorLabelMap, CV_8UC1);
+	cv::applyColorMap(colorLabelMap, colorLabelMap, COLORMAP_JET);
+	cv::imshow("Color Map", colorLabelMap);
+
+
+	
 	return true;
 }

@@ -18,10 +18,14 @@ public:
 	std::vector<float> white_point;
 	std::vector<float> green_point;
 
+	std::vector<cv::Point2i> toBeRemovedRegionWhite;
+	std::vector<cv::Point2i> toBeRemovedRegionGreen;
+
 	bool green_plate = false;
 	bool white_plate = false;
 
 	void run(Mat src);
+
 
 private:
 	bool inSameLP(CConnectedComponent &a, CConnectedComponent &b, bool isGreen);
