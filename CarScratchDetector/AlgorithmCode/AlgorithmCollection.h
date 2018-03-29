@@ -238,6 +238,9 @@ cv::Mat GetAlphaMap(const cv::Mat &labelMap, const cv::Rect &ROI, const Cluster&
 /************************************************************************/
 /**************			Utility Functions					*************/
 /************************************************************************/
+// 주어진 이미지 (in_givenImage)에서 폐구간 (in_range)에 해당하는 값이 존재하면 그곳을 모두 255로 채운다. 만일, bInversion이 true이면 반전시킨다.
+void ThresholdImageWithinCertainInterval(cv::Mat& in_givenImage, std::vector<int>& in_range, bool bInversion, cv::Mat& out_binaryImage);
+
 // 클러스터들의 Contour를 그린다.
 void DrawContoursOfClusters(cv::Mat & in_targetImage, const std::unordered_map<int, Cluster>& in_clusters, cv::Scalar in_color);
 // 단일 클러스의 Contour를 그린다.

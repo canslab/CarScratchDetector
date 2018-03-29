@@ -551,6 +551,27 @@ void GetAllAdjacentLabelsAndTheirFrequency(const Cluster& in_cluster, const cv::
 /****       Utility Functions' Implementation *****/
 /**************************************************/
 
+void ThresholdImageWithinCertainInterval(cv::Mat& in_givenImage, std::vector<int>& in_range, bool bInversion, cv::Mat& out_binaryImage)
+{
+	if (out_binaryImage.data)
+	{
+		out_binaryImage.release();
+	}
+
+	out_binaryImage = cv::Mat(in_givenImage.rows, in_givenImage.cols, CV_8UC1, cv::Scalar::all(0));
+	for (auto rowIndex = 0; rowIndex < in_givenImage.rows; ++rowIndex)
+	{
+		for (auto colIndex = 0; colIndex < in_givenImage.cols; ++colIndex)
+		{
+			uchar currentValue = in_givenImage.at<uchar>(rowIndex, colIndex);
+			if (currentValue >= in_range[0] && currentValue <= in_range[1])
+			{
+				out_binaryImage.at<uchar>(rowIndex, colIndex) = ~bInversion;
+			}
+		}
+	}
+}
+
 void DrawContoursOfClusters(cv::Mat & in_targetImage, const std::unordered_map <int, Cluster>& in_clusters, cv::Scalar in_color)
 {
 	for (auto& eachCluster : in_clusters)
@@ -831,17 +852,21 @@ static int FindMaxIndexInArray(std::vector<T> &in_vector, int in_totalSize)
 /*****************************************************/
 /****      For Client Function Implementation    *****/
 /*****************************************************/
+#pragma optimize("gpsy", off)
 bool ExtractCarBody(const cv::Mat & in_srcImage, const AlgorithmParameter& in_parameter, AlgorithmResult& out_result)
 {
 	cv::Mat filteredImageMat_luv;												// 원본이미지의 민 쉬프트 필터링된 버젼
 	cv::Mat originalImage;														// 원본이미지
+	cv::Mat originalHSVImage;
 	cv::Mat luvOriginalImageMat;												// 원본이미지의 LUV format
 	cv::Mat labelMap;															// 레이블맵
-	
+
 	in_srcImage.copyTo(originalImage);											// 입력받은 이미지를 deep copy해옴.
 	cv::cvtColor(originalImage, luvOriginalImageMat, CV_BGR2Luv);				// 원본이미지 Color Space 변환 (BGR -> Luv)
+	cv::cvtColor(originalImage, originalHSVImage, CV_BGR2HSV);
 
-	cv::Point2d imageCenter(originalImage.cols / 2, originalImage.rows / 2);
+	cv::Point2d imageCenter(originalImage.cols / 2, originalImage.rows / 2);	// 이미지 중심
+	int kTotalPixels = originalImage.total();									// 총 픽셀수 저장
 
 	double sp = in_parameter.GetSpatialBandwidth();								// Mean Shift Filtering을 위한 spatial radius
 	double sr = in_parameter.GetColorBandwidth();								// Mean Shift Filtering을 위한 range (color) radius
@@ -858,60 +883,60 @@ bool ExtractCarBody(const cv::Mat & in_srcImage, const AlgorithmParameter& in_pa
 	int minThresholdToBeCluster = (int)(originalImage.rows * originalImage.cols * 0.02);
 	PerformClustering(filteredImageMat_luv, cv::Rect(0, 0, originalImage.cols, originalImage.rows), minThresholdToBeCluster, labelMap, clusters);
 
-	const int kNumberOfCandidateClusters = 4;
-	const int kNumberOfRandomSamples = (minThresholdToBeCluster < 200) ? minThresholdToBeCluster : 200;
-	std::vector<int> candidateClusterLabels(kNumberOfCandidateClusters);
-	std::vector<double> candidateClusterMagnitudes(kNumberOfCandidateClusters);
-	std::vector<double> candidateClusterWeights(kNumberOfCandidateClusters);
-	std::vector<double> candidateClusterScores(kNumberOfCandidateClusters);
+	//const int kNumberOfCandidateClusters = 4;
+	//const int kNumberOfRandomSamples = (minThresholdToBeCluster < 200) ? minThresholdToBeCluster : 200;
+	//std::vector<int> candidateClusterLabels(kNumberOfCandidateClusters);
+	//std::vector<double> candidateClusterMagnitudes(kNumberOfCandidateClusters);
+	//std::vector<double> candidateClusterWeights(kNumberOfCandidateClusters);
+	//std::vector<double> candidateClusterScores(kNumberOfCandidateClusters);
 
-	// 규모가 큰 #(kNumberOfCandidateClusters)개의 클러스터 레이블을 취득한다.
-	for (const auto& eachCluster : clusters)
-	{
-		int currentLabel = eachCluster.first;
-		int currentSize = eachCluster.second.GetTotalPoints();
-		int i = 0;
+	//// 규모가 큰 #(kNumberOfCandidateClusters)개의 클러스터 레이블을 취득한다.
+	//for (const auto& eachCluster : clusters)
+	//{
+	//	int currentLabel = eachCluster.first;
+	//	int currentSize = eachCluster.second.GetTotalPoints();
+	//	int i = 0;
 
-		while (i <= (kNumberOfCandidateClusters - 1))
-		{
-			if (currentSize > clusters[candidateClusterLabels[i]].GetTotalPoints())
-			{
-				// move one by one until i becomes 2
-				while (i <= (kNumberOfCandidateClusters - 1))
-				{
-					int temp = candidateClusterLabels[i];
-					candidateClusterLabels[i] = currentLabel;
-					currentLabel = temp;
-					i++;
-				}
-			}
-			i++;
-		}
-	}
+	//	while (i <= (kNumberOfCandidateClusters - 1))
+	//	{
+	//		if (currentSize > clusters[candidateClusterLabels[i]].GetTotalPoints())
+	//		{
+	//			// move one by one until i becomes 2
+	//			while (i <= (kNumberOfCandidateClusters - 1))
+	//			{
+	//				int temp = candidateClusterLabels[i];
+	//				candidateClusterLabels[i] = currentLabel;
+	//				currentLabel = temp;
+	//				i++;
+	//			}
+	//		}
+	//		i++;
+	//	}
+	//}
 
-	auto largerLength = (originalImage.cols > originalImage.rows) ? originalImage.cols : originalImage.rows;
-	const double expCoefficient = -12.5 / pow(largerLength, 2);
+	//auto largerLength = (originalImage.cols > originalImage.rows) ? originalImage.cols : originalImage.rows;
+	//const double expCoefficient = -12.5 / pow(largerLength, 2);
 
-	for (int i = 0; i < kNumberOfCandidateClusters; ++i)
-	{
-		Cluster& currentCandidateCluster = clusters[candidateClusterLabels[i]];
-		int currentCandidateClusterSize = currentCandidateCluster.GetTotalPoints();
-		const auto& currentCandidateClusterPoints = currentCandidateCluster.GetPointsArray();
+	//for (int i = 0; i < kNumberOfCandidateClusters; ++i)
+	//{
+	//	Cluster& currentCandidateCluster = clusters[candidateClusterLabels[i]];
+	//	int currentCandidateClusterSize = currentCandidateCluster.GetTotalPoints();
+	//	const auto& currentCandidateClusterPoints = currentCandidateCluster.GetPointsArray();
 
-		candidateClusterMagnitudes[i] = currentCandidateClusterSize;
+	//	candidateClusterMagnitudes[i] = currentCandidateClusterSize;
 
-		double averageDistanceFromCenter = 0.0;
-		// weight를 계산할 때, 클러스터에 속하는 픽셀을 random하게 몇 점 샘플링한다.
-		for (int sampleIndex = 0; sampleIndex < kNumberOfRandomSamples; ++sampleIndex)
-		{
-			cv::Point2d tempPoint = currentCandidateClusterPoints[std::rand() % currentCandidateClusterSize];
-			averageDistanceFromCenter += cv::norm(tempPoint - imageCenter);
-		}
-		averageDistanceFromCenter /= kNumberOfRandomSamples;
+	//	double averageDistanceFromCenter = 0.0;
+	//	// weight를 계산할 때, 클러스터에 속하는 픽셀을 random하게 몇 점 샘플링한다.
+	//	for (int sampleIndex = 0; sampleIndex < kNumberOfRandomSamples; ++sampleIndex)
+	//	{
+	//		cv::Point2d tempPoint = currentCandidateClusterPoints[std::rand() % currentCandidateClusterSize];
+	//		averageDistanceFromCenter += cv::norm(tempPoint - imageCenter);
+	//	}
+	//	averageDistanceFromCenter /= kNumberOfRandomSamples;
 
-		candidateClusterWeights[i] = exp(expCoefficient * pow(averageDistanceFromCenter, 2));
-		candidateClusterScores[i] = candidateClusterWeights[i] * candidateClusterMagnitudes[i];
-	}
+	//	candidateClusterWeights[i] = exp(expCoefficient * pow(averageDistanceFromCenter, 2));
+	//	candidateClusterScores[i] = candidateClusterWeights[i] * candidateClusterMagnitudes[i];
+	//}
 
 #if true
 	cv::Mat filteredImageInBGR;
@@ -919,87 +944,163 @@ bool ExtractCarBody(const cv::Mat & in_srcImage, const AlgorithmParameter& in_pa
 
 	cv::cvtColor(filteredImageMat_luv, filteredImageInBGR, CV_Luv2BGR);
 	cv::cvtColor(filteredImageInBGR, filteredImageInHSV, CV_BGR2HSV);
-	
+
 #endif
 
-	/////////////////////////////////
-	//							   //
-	// 02.  Color Merging		   //
-	//							   //
-	/////////////////////////////////
-	int seedClusterIndex = candidateClusterLabels[FindMaxIndexInArray<double>(candidateClusterScores, kNumberOfCandidateClusters)];
+	///////////////////////////////////
+	////							   //
+	//// 02.  Color Merging		   //
+	////							   //
+	///////////////////////////////////
+	//int seedClusterIndex = candidateClusterLabels[FindMaxIndexInArray<double>(candidateClusterScores, kNumberOfCandidateClusters)];
 
-	// 가장 점수가 높은 클러스터가, 시드 클러스터(차체 중 일부)이다. 
-	// 이제 이 클러스터를 기점으로 Merging한다.
-	Cluster seedCluster = clusters[seedClusterIndex];
-	cv::Point3i seedClusterHSVColor = seedCluster.GetHSVColor();
-	cv::Point3i seedClusterLuvColor = seedCluster.GetLuvColor();
+	//// 가장 점수가 높은 클러스터가, 시드 클러스터(차체 중 일부)이다. 
+	//// 이제 이 클러스터를 기점으로 Merging한다.
+	//Cluster seedCluster = clusters[seedClusterIndex];
+	//cv::Point3i seedClusterHSVColor = seedCluster.GetHSVColor();
+	//cv::Point3i seedClusterLuvColor = seedCluster.GetLuvColor();
 
-	std::set<int> toBeMergedClusterIndices;
+	//std::set<int> toBeMergedClusterIndices;
 
-	for (const auto& eachCluster : clusters)
-	{
-		const cv::Point3i& eachClusterHSVColor = eachCluster.second.GetHSVColor();
-		const cv::Point3i& eachClusterLuvColor = eachCluster.second.GetLuvColor();
+	//for (const auto& eachCluster : clusters)
+	//{
+	//	const cv::Point3i& eachClusterHSVColor = eachCluster.second.GetHSVColor();
+	//	const cv::Point3i& eachClusterLuvColor = eachCluster.second.GetLuvColor();
 
-		auto hueDiff = std::abs(seedClusterHSVColor.x - eachClusterHSVColor.x);
-		auto satDiff = std::abs(seedClusterHSVColor.y - eachClusterHSVColor.y);
-		auto valDiff = std::abs(seedClusterHSVColor.z - eachClusterHSVColor.z);
+	//	auto hueDiff = std::abs(seedClusterHSVColor.x - eachClusterHSVColor.x);
+	//	auto satDiff = std::abs(seedClusterHSVColor.y - eachClusterHSVColor.y);
+	//	auto valDiff = std::abs(seedClusterHSVColor.z - eachClusterHSVColor.z);
 
-		auto lDiff = std::abs(seedClusterLuvColor.x - eachClusterLuvColor.x);
-		auto uDiff = std::abs(seedClusterLuvColor.y - eachClusterLuvColor.y);
-		auto vDiff = std::abs(seedClusterLuvColor.z - eachClusterLuvColor.z);
+	//	auto lDiff = std::abs(seedClusterLuvColor.x - eachClusterLuvColor.x);
+	//	auto uDiff = std::abs(seedClusterLuvColor.y - eachClusterLuvColor.y);
+	//	auto vDiff = std::abs(seedClusterLuvColor.z - eachClusterLuvColor.z);
 
-		bool bOkayToMerge = false;
+	//	bool bOkayToMerge = false;
 
-		if (hueDiff <= 5 && satDiff <= 10 && valDiff <= 10)
-		{
-			// similar! 
-			bOkayToMerge = true;
-		}
-		else if (hueDiff <= 5 && seedClusterHSVColor.y >= 200 && eachClusterHSVColor.y >= 200 && seedClusterHSVColor.z >= 100 && eachClusterHSVColor.z >= 100)
-		{
-			bOkayToMerge = true;
-		}
-		else if (lDiff <= 50 && uDiff <= 15 && vDiff <= 15)
-		{
-			bOkayToMerge = true;
-		}
+	//	if (hueDiff <= 5 && satDiff <= 10 && valDiff <= 10)
+	//	{
+	//		// similar! 
+	//		bOkayToMerge = true;
+	//	}
+	//	else if (hueDiff <= 5 && seedClusterHSVColor.y >= 200 && eachClusterHSVColor.y >= 200 && seedClusterHSVColor.z >= 100 && eachClusterHSVColor.z >= 100)
+	//	{
+	//		bOkayToMerge = true;
+	//	}
+	//	else if (lDiff <= 50 && uDiff <= 15 && vDiff <= 15)
+	//	{
+	//		bOkayToMerge = true;
+	//	}
 
-		if (bOkayToMerge == true)
-		{
-			toBeMergedClusterIndices.insert(eachCluster.first);
-		}
-	}
-	for (auto& eachIndex : toBeMergedClusterIndices)
-	{
-		seedCluster.Consume(clusters[eachIndex]);
-	}
+	//	if (bOkayToMerge == true)
+	//	{
+	//		toBeMergedClusterIndices.insert(eachCluster.first);
+	//	}
+	//}
+	//for (auto& eachIndex : toBeMergedClusterIndices)
+	//{
+	//	seedCluster.Consume(clusters[eachIndex]);
+	//}
 
-	DrawOuterContourOfCluster(originalImage, seedCluster, cv::Scalar(255, 255, 0));
-	cv::imshow("Contour Image", originalImage);
+	////DrawOuterContourOfCluster(originalImage, seedCluster, cv::Scalar(255, 255, 0));
+
+	//cv::imshow("Contour Image", originalImage);
+	//cv::GaussianBlur(originalHSVImage, originalHSVImage, cv::Size(5,5), 2);
 
 	cv::Mat hsvPlanes[3];
 	cv::Mat LUVPlanes[3];
 	cv::split(filteredImageMat_luv, LUVPlanes);
 	cv::split(filteredImageInHSV, hsvPlanes);
 
+	int nHueIntervals = 9;
+	int nSatIntervals = 16;
+	std::vector<int> hueArray(nHueIntervals);
+	std::vector<int> satArray(nSatIntervals);
+
 	cv::Mat colorMapOfHue;
 	cv::applyColorMap(hsvPlanes[0], colorMapOfHue, COLORMAP_HOT);
 	cv::imshow("Hue Distribution", colorMapOfHue);
 
-	
-	cv::Mat colorMapOfLuminance;
-	cv::applyColorMap(LUVPlanes[0], colorMapOfLuminance, COLORMAP_HOT);
-	cv::imshow("L Distribution", colorMapOfLuminance);
-
-	cv::Mat colorLabelMap;
-	cv::normalize(labelMap, colorLabelMap, 0, 255, NORM_MINMAX);
-	colorLabelMap.convertTo(colorLabelMap, CV_8UC1);
-	cv::applyColorMap(colorLabelMap, colorLabelMap, COLORMAP_JET);
-	cv::imshow("Color Map", colorLabelMap);
+	cv::Mat colorMapOfSat;
+	cv::applyColorMap(hsvPlanes[1], colorMapOfSat, COLORMAP_HOT);
+	cv::imshow("Sat Distribution", colorMapOfSat);
 
 
-	
+	// 이미지의 색상 분포를 파악하는데 사용
+	for (int rowIndex = (originalImage.rows / 4) - 1; rowIndex < ((originalImage.rows * 3) / 4); ++rowIndex)
+	{
+		for (int colIndex = (originalImage.cols / 4) - 1; colIndex < ((originalImage.cols * 3) / 4); ++colIndex)
+		{
+			hueArray[(int)(hsvPlanes[0].at<uchar>(rowIndex, colIndex) / (180 / nHueIntervals))]++;
+			satArray[(int)(hsvPlanes[1].at<uchar>(rowIndex, colIndex) / (256 / nSatIntervals))]++;
+		}
+	}
+
+	// 0.85를 넘어서면 이건 흰색 차량이야.
+	float satRatio = (float)(satArray[0] + satArray[1]) / (kTotalPixels / 4);
+	cv::Mat lastBinaryImage(originalImage.rows, originalImage.cols, CV_8UC1, cv::Scalar::all(0));
+
+	// 회색 차량임.
+	if (satRatio > 0.65)
+	{
+		cv::Mat saturationBinaryImage;
+		cv::Mat valueBinaryImage;
+
+		//ThresholdImageWithinCertainInterval(hsvPlanes[1], satRange, false, saturationBinaryImage);
+		cv::inRange(hsvPlanes[1], 0, 32, saturationBinaryImage);
+		cv::threshold(hsvPlanes[2], valueBinaryImage, 90, 255, CV_THRESH_BINARY);
+		lastBinaryImage = saturationBinaryImage & valueBinaryImage;
+
+		cv::medianBlur(lastBinaryImage, lastBinaryImage, 7);
+	}
+
+	//채색 (색이 있는!) 차량이면
+	else if (satRatio < 0.3)
+	{
+		cv::Mat hueThresholdedImage;
+		auto maxIndex = FindMaxIndexInArray<int>(hueArray, hueArray.size());
+		float hueRatio = (float)hueArray[maxIndex] / (kTotalPixels / 4);
+
+		if (hueRatio > 0.6)
+		{
+			cv::inRange(hsvPlanes[0], maxIndex * (180 / nHueIntervals), (maxIndex + 1) * (180 / nHueIntervals), hueThresholdedImage);
+			cv::medianBlur(hueThresholdedImage, hueThresholdedImage, 5);
+			lastBinaryImage = hueThresholdedImage;
+		}
+	}
+	else
+	{
+		lastBinaryImage.release();
+	}
+
+	if (lastBinaryImage.data)
+	{
+		std::vector<std::vector<cv::Point>> contours;
+		cv::findContours(lastBinaryImage, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_NONE);
+
+		int currentMax = 0;
+		int currentIndex = 0;
+		for (int i = 0; i < contours.size(); ++i)
+		{
+			if (currentMax < contours[i].size())
+			{
+				currentMax = contours[i].size();
+				currentIndex = i;
+			}
+		}
+		cv::imshow("Binary Image", lastBinaryImage);
+		cv::drawContours(originalImage, contours, currentIndex, cv::Scalar(255, 255, 0), 4);
+		int bInside = cv::pointPolygonTest(contours[currentIndex], cv::Point2f(167, 129), false);
+	}
+
+	// 레이블맵을 컬러매핑해서 Visualize한다
+	//cv::Mat colorLabelMap;
+	//cv::normalize(labelMap, colorLabelMap, 0, 255, NORM_MINMAX);
+	//colorLabelMap.convertTo(colorLabelMap, CV_8UC1);
+	//cv::applyColorMap(colorLabelMap, colorLabelMap, COLORMAP_JET);
+	//cv::imshow("Color Map", colorLabelMap);
+
+	cv::imshow("Result", originalImage);
+
 	return true;
 }
+#pragma optimize("gpsy", on)
