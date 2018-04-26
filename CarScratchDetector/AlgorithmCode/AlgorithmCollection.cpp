@@ -852,6 +852,112 @@ static int FindMaxIndexInArray(std::vector<T> &in_vector, int in_totalSize)
 /*****************************************************/
 /****      For Client Function Implementation    *****/
 /*****************************************************/
+
+#pragma optimize("gpsy", off)
+void FindPossibleDefectAreas(const cv::Mat &in_imageMat, const std::vector<cv::Point>& in_contourOfSearchArea, std::vector<cv::Point> &out_detectedArea)
+{
+	// in_contourOfSearchArea에서 결함 부위들을 찾는다.
+	//cv::SimpleBlobDetector::Params blobDetectorParam
+	cv::Mat copiedBlurImage;
+	GaussianBlur(in_imageMat, copiedBlurImage, cv::Size(3, 3), 0, 0, BORDER_DEFAULT);
+	cv::cvtColor(copiedBlurImage, copiedBlurImage, CV_BGR2GRAY);
+
+	cv::Mat grad_x, grad_y;
+	cv::Mat abs_grad_x, abs_grad_y;
+	cv::Mat grad;
+
+	cv::Sobel(copiedBlurImage, grad_x, CV_16S, 1, 0, 3);
+	cv::Sobel(copiedBlurImage, grad_y, CV_16S, 0, 1, 3);
+
+	cv::convertScaleAbs(grad_x, abs_grad_x);
+	cv::convertScaleAbs(grad_y, abs_grad_y);
+
+	cv::addWeighted(abs_grad_x, 0.2, abs_grad_y, 0.8, 0, grad);
+
+	for (auto rowIndex = 0; rowIndex < copiedBlurImage.rows; ++rowIndex)
+	{
+		for (auto colIndex = 0; colIndex < copiedBlurImage.cols; ++colIndex)
+		{
+			bool bOutside = (cv::pointPolygonTest(in_contourOfSearchArea, cv::Point2f(colIndex, rowIndex), false) <= 0);
+
+			if (bOutside)
+			{
+				grad.at<uchar>(rowIndex, colIndex) = 0;
+			}
+		}
+	}
+	cv::imshow("Gradient Image", grad);
+	//cv::inRange(grad, 100, 220, grad);
+}
+#pragma optimize("gpsy", on)
+
+#pragma optimize("gpsy", off)
+void FindPossibleDefectAreasUsingBlobDetection(const cv::Mat & in_imageMat, const std::vector<cv::Point>& out_centerPointsOfPossibleAreas)
+{
+	cv::Mat testImage;
+	cv::SimpleBlobDetector::Params param;
+
+	cv::cvtColor(in_imageMat, testImage, COLOR_BGR2GRAY);
+	float totalPixels = in_imageMat.rows * in_imageMat.cols;
+
+	// Change thresholds
+	param.minThreshold = 10;
+	param.maxThreshold = 200;
+
+	param.filterByColor = true;
+	param.blobColor = 0;
+
+	// Filter by Area.
+	param.filterByArea = true;
+	param.minArea = 10;
+	param.maxArea = 200;
+
+	// Filter by Circularity
+	//param.filterByCircularity = true;
+	//param.minCircularity = 0.1;
+
+	//// Filter by Convexity
+	//param.filterByConvexity = true;
+	//param.minConvexity = 0.87;
+
+	// Filter by Inertia
+	param.filterByInertia = true;
+	param.minInertiaRatio = 0;
+	param.maxInertiaRatio = 0.5;
+	cv::Ptr<cv::SimpleBlobDetector> detector = cv::SimpleBlobDetector::create(param);
+	
+	std::vector<cv::KeyPoint> keypoints;
+	detector->detect(testImage, keypoints);
+
+	cv::drawKeypoints(testImage, keypoints, testImage);
+	cv::imshow("Blob Detection Result", testImage);
+	int a = 30;
+}
+#pragma optimize("gpsy", on)
+
+
+
+#pragma optimize("gpsy", off)
+void GetPointsInContour(const cv::Size& in_imageSize, const std::vector<cv::Point>& in_contour, std::vector<cv::Point>& out_insidePoints)
+{
+	assert(out_insidePoints.size() == 0 && in_imageSize.width > 0 && in_imageSize.height > 0 && in_contour.size() > 0);
+
+	for (auto rowIndex = 0; rowIndex < in_imageSize.height; ++rowIndex)
+	{
+		for (auto colIndex = 0; colIndex < in_imageSize.width; ++colIndex)
+		{
+			bool bInside = (cv::pointPolygonTest(in_contour, cv::Point2f(colIndex, rowIndex), false) > 0);
+
+			if (bInside)
+			{
+				out_insidePoints.push_back(cv::Point(colIndex, rowIndex));
+			}
+		}
+	}
+}
+#pragma optimize("gpsy", on)
+
+
 #pragma optimize("gpsy", off)
 bool ExtractCarBody(const cv::Mat & in_srcImage, const AlgorithmParameter& in_parameter, AlgorithmResult& out_result)
 {
@@ -921,7 +1027,7 @@ bool ExtractCarBody(const cv::Mat & in_srcImage, const AlgorithmParameter& in_pa
 	// 0.65를 넘어서면 이건 흰색 차량이야.
 	float lowSaturationPixelRatio = (float)(satArray[0] + satArray[1]) / (kTotalPixels / 4);
 	cv::Mat lastBinaryImage(originalImage.rows, originalImage.cols, CV_8UC1, cv::Scalar::all(0));
-	
+
 	bool bImageHasLowSaturationCarColor = (lowSaturationPixelRatio > 0.65);
 
 	// 이미지에서 대부분의 픽셀이 무채색임. (0.65란 전체이미지 픽셀 중 65%가 0에 가까운 채도이다.)
@@ -981,14 +1087,19 @@ bool ExtractCarBody(const cv::Mat & in_srcImage, const AlgorithmParameter& in_pa
 			}
 		}
 		cv::imshow("Binary Image", lastBinaryImage);
+
+		std::vector<cv::Point> insidePoints;
+		std::vector<cv::Point> defectAreas;
+		//GetPointsInContour(cv::Size(originalImage.cols, originalImage.rows), contours[currentMaxIndex], insidePoints);
+		FindPossibleDefectAreas(originalImage, contours[currentMaxIndex], defectAreas);
+		FindPossibleDefectAreasUsingBlobDetection(originalImage, defectAreas);
 		cv::drawContours(originalImage, contours, currentMaxIndex, cv::Scalar(255, 255, 0), 4);
-		int bInside = cv::pointPolygonTest(contours[currentMaxIndex], cv::Point2f(167, 129), false);
+
 	}
+	//FindPossibleDefectAreas ()
 
-	std::vector<cv::KeyPoint> keypoints;
-
-	cv::SimpleBlobDetector::Params params = SimpleBlobDetector::Params();
-	//params.blobColor = 
+	//std::vector<cv::KeyPoint> keypoints;
+	//cv::SimpleBlobDetector::Params params = SimpleBlobDetector::Params();
 
 	// 레이블맵을 컬러매핑해서 Visualize한다
 	//cv::Mat colorLabelMap;
