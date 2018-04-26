@@ -1,5 +1,6 @@
 #pragma once
 #include <opencv2\opencv.hpp>
+#include <unordered_map>
 
 // 점들을 보유하는 Cluster 클래스
 class Cluster
@@ -12,7 +13,7 @@ private:
 	// 클러스터 내부에 존재하는 모든 점(x, y좌표)들을 열벡터에 저장. 각 원소는 좌표 값이므로 2채널
 	std::vector<cv::Point> m_pointsArray;
 	// 클러스터내부의 레이블 값
-	std::vector<int> m_labels;
+	int m_label;
 
 public:
 	cv::Point2d GetCenterPoint() const
@@ -45,6 +46,11 @@ public:
 		return m_pointsArray;
 	}
 
+	int GetLabel() const
+	{
+		return m_label;
+	}
+
 	// 클러스터 대표 색상값을 추출.
 	inline const cv::Point3i& GetLuvColor() const
 	{
@@ -57,18 +63,6 @@ public:
 	inline const cv::Rect& GetBoundedBox() const
 	{
 		return m_boundedBox;
-	}
-	bool DoesContain(int in_labelIndex) const
-	{
-		// 못찾았다면
-		if (std::find(m_labels.begin(), m_labels.end(), in_labelIndex) == m_labels.end())
-		{
-			return false;
-		}
-		else
-		{
-			return true;
-		}
 	}
 
 public:
@@ -92,6 +86,11 @@ public:
 	{
 		m_boundedBox = in_rect;
 	}
+	void SetLabel(int in_label)
+	{
+		assert(in_label >= 0);
+		m_label = in_label;
+	}
 
 	void AddPointsFromArray(const cv::Point in_points[], int nTotalPoints)
 	{
@@ -114,19 +113,6 @@ public:
 		}
 	}
 
-	void RemoveLabelInformation()
-	{
-		m_labels.clear();
-	}
-
-	void RegisterLabel(int label)
-	{
-		// 기존에 없을 때만 등록함.
-		if (this->DoesContain(label) == false)
-		{
-			m_labels.push_back(label);
-		}
-	}
 public:
 	// assignment
 	Cluster& operator=(const Cluster& in_cluster)
@@ -137,7 +123,7 @@ public:
 		this->m_colorInLuv = in_cluster.m_colorInLuv;
 		this->m_colorInHSV = in_cluster.m_colorInHSV;
 		this->m_boundedBox = cv::Rect(in_rect.x, in_rect.y, in_rect.width, in_rect.height);
-		this->m_labels = in_cluster.m_labels;
+		this->m_label = in_cluster.m_label;
 		return *this;
 	}
 
@@ -148,11 +134,11 @@ public:
 		this->m_colorInLuv = in_cluster.m_colorInLuv;
 		this->m_colorInHSV = in_cluster.m_colorInHSV;
 		this->m_boundedBox = in_cluster.m_boundedBox;
-		this->m_labels = in_cluster.m_labels;
+		this->m_label = in_cluster.m_label;
 	}
 
 	// 기본생성자
-	Cluster() :m_pointsArray(0), m_labels(0)
+	Cluster() :m_pointsArray(0), m_label(-1)
 	{
 
 	}
@@ -165,6 +151,5 @@ public:
 		this->m_boundedBox = this->m_boundedBox | in_cluster.m_boundedBox;
 		this->m_colorInLuv = (in_cluster.m_colorInLuv + this->m_colorInLuv) / 2;
 		this->m_colorInHSV = (in_cluster.m_colorInHSV + this->m_colorInHSV) / 2;
-		this->m_labels.insert((this->m_labels).begin(), in_cluster.m_labels.begin(), in_cluster.m_labels.end());
 	}
 };

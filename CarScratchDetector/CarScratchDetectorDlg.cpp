@@ -50,8 +50,8 @@ BOOL CCarScratchDetectorDlg::OnInitDialog()
 	SetIcon(m_hIcon, FALSE);		// 작은 아이콘을 설정합니다.
 
 	// TODO: 여기에 추가 초기화 작업을 추가합니다.	
-	m_spatialRadiusEditBox.SetWindowTextA("20");
-	m_colorRadiusEditBox.SetWindowTextA("20");
+	m_spatialRadiusEditBox.SetWindowTextA("10");
+	m_colorRadiusEditBox.SetWindowTextA("16");
 
 	return TRUE;  // 포커스를 컨트롤에 설정하지 않으면 TRUE를 반환합니다.
 }
@@ -136,7 +136,6 @@ void CCarScratchDetectorDlg::OnBnClickedOpenimagefilebtn()
 			m_imageWidthText.SetWindowTextA(std::to_string(m_srcMat.cols).c_str());
 			m_imageHeightText.SetWindowTextA(std::to_string(m_srcMat.rows).c_str());
 		}
-
 		cv::imshow("Input Image", m_srcMat);
 	}
 }

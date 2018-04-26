@@ -41,34 +41,6 @@ void ExpandRectInAnyFourDirections(cv::Size in_limitBox, cv::Rect& in_rect, int 
 		in_rect.height = in_limitBox.height - in_rect.y;
 	}
 }
-void GetLabelsOfAdjacentClusters(const cv::Mat & in_labelMap, const Cluster & in_centerCluster, const cv::Rect& in_ROI, std::set<int>& out_labels)
-{
-	const cv::Rect& kROI = in_ROI;
-	const int kRowStartIndex = kROI.y; // 0 based value임을 잊지말자.
-	const int kRowEndIndex = kRowStartIndex + kROI.height - 1;
-	const int kColStartIndex = kROI.x;
-	const int kColEndIndex = kColStartIndex + kROI.width - 1;
-
-	// 4 방향 (위, 아래, 왼쪽, 오른쪽)에서 범위를 좁혀와야함.
-	// 왼쪽 (행이동)
-	for (int rowIndex = kRowStartIndex; rowIndex <= kRowEndIndex; ++rowIndex)
-	{
-		for (int colIndex = kColStartIndex; colIndex <= kColEndIndex; ++colIndex)
-		{
-			auto currentLabel = in_labelMap.at<int>(rowIndex, colIndex);
-
-			if (in_centerCluster.DoesContain(currentLabel) == false)
-			{
-				if (out_labels.count(currentLabel) == 0)
-				{
-					// currentLabel이 mainCluster에 속하지 않는다는것이므로,
-					// 인접한 영역의 레이블이라 할 수 있다.
-					out_labels.insert(currentLabel);
-				}
-			}
-		}
-	}
-}
 double GetHSVBhattaCoefficient(const cv::Mat& in_img, const Cluster &in_cluster1, const Cluster &in_cluster2, int channelNumber, int in_nBin)
 {
 	auto& pointArray1 = in_cluster1.GetPointsArray();
@@ -176,9 +148,10 @@ void PerformClustering(cv::Mat& in_luvWholeImage, const cv::Rect& in_ROI, int in
 					// 클러스터 컨테이너(unordered_map)에 Cluster를 등록
 					out_clusters[clusterIndex] = Cluster();
 					Cluster& eachCluster = out_clusters[clusterIndex];
+					//eachCluster
 
 					// cluster에 본인이 몇 번째 레이블인지 저장.
-					eachCluster.RegisterLabel(clusterIndex);
+					eachCluster.SetLabel(clusterIndex);
 
 					// Copy all points to eachcluster
 					cv::Point* ptData = (cv::Point*)findIndexColumnVector.data;
@@ -273,278 +246,6 @@ void GetBackgroundClusterIndices(const cv::Size & in_originalImageSize, const cv
 		}
 	}
 	out_backgroundIndiciesSet.erase(NOT_CLUSTER_LABEL);
-}
-cv::Mat GetAlphaMap(const cv::Mat& labelMap, const cv::Rect& ROI, const Cluster &mainCluster)
-{
-	cv::Mat alphaMap = cv::Mat::zeros(labelMap.size(), CV_8UC1);
-	// Find contour that has minimum area.
-	std::vector<cv::Point> leftLine;
-	std::vector<cv::Point> rightLine;
-	std::vector<cv::Point> topLine;
-	std::vector<cv::Point> botLine;
-
-	for (int y = ROI.y; y < ROI.y + ROI.height; y++)
-	{
-		leftLine.push_back(cv::Point(ROI.x, y));
-		rightLine.push_back(cv::Point(ROI.x + ROI.width - 1, y));
-	}
-
-	for (int x = ROI.x; x < ROI.x + ROI.width; x++)
-	{
-		topLine.push_back(cv::Point(x, ROI.y));
-		botLine.push_back(cv::Point(x, ROI.y + ROI.height - 1));
-	}
-
-	for (int i = 0; i < leftLine.size(); i++)
-	{
-		cv::Point curLeftPt = leftLine[i];
-		cv::Point curRightPt = rightLine[i];
-		bool isLeftConverged = false;
-		bool isRightConverged = false;
-		while (1)
-		{
-			if (curLeftPt.x - curRightPt.x < 2 && curLeftPt.x - curRightPt.x > -2)
-			{
-				// Not converged. Odd situation
-				//if(!isLeftConverged)
-				curLeftPt = cv::Point(-1, -1);
-				//if(!isRightConverged)
-				curRightPt = cv::Point(-1, -1);
-				break;
-			}
-
-			if (!isLeftConverged && mainCluster.DoesContain(labelMap.at<int>(curLeftPt)))
-			{
-				isLeftConverged = true;
-			}
-			else if (!isLeftConverged)
-			{
-				curLeftPt.x += 1;
-			}
-
-			if (!isRightConverged &&
-				mainCluster.DoesContain(labelMap.at<int>(curRightPt)))
-			{
-				isRightConverged = true;
-			}
-			else if (!isRightConverged)
-			{
-				curRightPt.x -= 1;
-			}
-
-			if (isRightConverged && isLeftConverged)
-				break;
-		}
-		leftLine[i] = curLeftPt;
-		rightLine[i] = curRightPt;
-	}
-
-	for (int i = 0; i < topLine.size(); i++)
-	{
-		cv::Point curTopPt = topLine[i];
-		cv::Point curBotPt = botLine[i];
-		bool isTopConverged = false;
-		bool isBotConverged = false;
-		while (1)
-		{
-			if (curTopPt.y - curBotPt.y < 2 && curTopPt.y - curBotPt.y > -2)
-			{
-				// Not converged. Odd situation
-				curTopPt = cv::Point(-1, -1);
-				curBotPt = cv::Point(-1, -1);
-				break;
-			}
-
-			if (!isTopConverged &&
-				mainCluster.DoesContain(labelMap.at<int>(curTopPt)))
-			{
-				isTopConverged = true;
-			}
-			else if (!isTopConverged)
-			{
-				curTopPt.y += 1;
-			}
-
-			if (!isBotConverged &&
-				mainCluster.DoesContain(labelMap.at<int>(curBotPt)))
-			{
-				isBotConverged = true;
-			}
-			else if (!isBotConverged)
-			{
-				curBotPt.y -= 1;
-			}
-
-			if (isTopConverged && isBotConverged)
-				break;
-		}
-		topLine[i] = curTopPt;
-		botLine[i] = curBotPt;
-	}
-
-	cv::Mat debug = cv::Mat::zeros(alphaMap.size(), CV_8UC3);
-	for (int i = 0; i < leftLine.size(); i++)
-	{
-		if (leftLine[i].x == -1)
-			continue;
-		//debug.at<cv::Vec3b>(leftLine[i]) = cv::Vec3b(255, 255, 255);
-		alphaMap.at<uchar>(leftLine[i]) = 255;
-		for (int x = leftLine[i].x; x < rightLine[i].x; x++)
-			//debug.at<cv::Vec3b>(leftLine[i].y, x) = cv::Vec3b(255, 255, 255);
-			alphaMap.at<uchar>(leftLine[i].y, x) = 255;
-	}
-	for (int i = 0; i < rightLine.size(); i++)
-	{
-		if (rightLine[i].x == -1)
-			continue;
-		//debug.at<cv::Vec3b>(rightLine[i]) = cv::Vec3b(0, 0, 255);
-		alphaMap.at<uchar>(rightLine[i]) = 255;
-	}
-	for (int i = 0; i < topLine.size(); i++)
-	{
-		if (topLine[i].x == -1)
-			continue;
-		//debug.at<cv::Vec3b>(topLine[i]) = cv::Vec3b(255, 0, 0);
-		alphaMap.at<uchar>(topLine[i]) = 255;
-		for (int y = topLine[i].y; y < botLine[i].y; y++)
-			//debug.at<cv::Vec3b>(y, topLine[i].x) = cv::Vec3b(255, 255, 255);
-			alphaMap.at<uchar>(y, topLine[i].x) = 255;
-
-	}
-	for (int i = 0; i < botLine.size(); i++)
-	{
-		if (botLine[i].x == -1)
-			continue;
-		//debug.at<cv::Vec3b>(botLine[i]) = cv::Vec3b(0, 255, 0);
-		alphaMap.at<uchar>(botLine[i]) = 255;
-	}
-	cv::rectangle(debug, ROI, cv::Scalar(255, 255, 255), 1, CV_AA);
-
-	return alphaMap;
-}
-bool IsClusterWrappedByCertainCluster(const Cluster &in_cluster, const cv::Mat & in_labelMap, int in_rangeToCover, float in_ratio, int& out_labelOfWrapperCluster)
-{
-	bool bWrapped = false;
-
-	std::vector<cv::Point> allEdgePoints;
-	std::unordered_map<int, int> labelsFrequencyOfAllEdgePoints;
-	std::pair<int, int> maxPair;
-
-	// Cluster의 Outer Contour를 이루고 있는 모든 점들을 구한다.
-	FindAllOuterPointsOfCluster(in_labelMap.size(), in_cluster, allEdgePoints);
-	const int kThreshold = (int)(allEdgePoints.size() * in_ratio);
-
-	// Step 1. 
-	// Search all edge points for the adjacent clusters
-	// Edge상에 존재하는 모든 점들에 대하여 생각한다.
-	for (const cv::Point& eachPoint : allEdgePoints)
-	{
-		cv::Point targetPoint;
-		std::unordered_map<int, int> frequencyOfLabels; // Key = Label, Value = # of occurence
-
-		// 한 Point를 기준으로 [in_rangeToCover x in_rangeToCover]의 영역을 생각한다.
-		for (int rowIndex = -in_rangeToCover; rowIndex <= in_rangeToCover; ++rowIndex)
-		{
-			targetPoint.y = eachPoint.y + rowIndex;
-
-			for (int colIndex = -in_rangeToCover; colIndex <= in_rangeToCover; ++colIndex)
-			{
-				targetPoint.x = eachPoint.x + colIndex;
-
-				int adjacentLabel = in_labelMap.at<int>(targetPoint);
-
-				// if adjacentLabel is certainly outer part of the cluster (in_cluster)
-				if (!in_cluster.DoesContain(adjacentLabel))
-				{
-					if (frequencyOfLabels.count(adjacentLabel) == 0)
-					{
-						frequencyOfLabels[adjacentLabel] = 0;
-					}
-					frequencyOfLabels[adjacentLabel]++;
-				}
-			}
-		}
-
-		// eachPoint를 둘러싸는 클러스터중 가장 비중이 큰 녀석을 구해 maxPair에 저장한다. 
-		// maxPair의 key값은 레이블이고 value는 등장 횟수이다.
-		SearchMapForMaxPair(frequencyOfLabels, 0, maxPair);
-
-		if (labelsFrequencyOfAllEdgePoints.count(maxPair.first) == 0)
-		{
-			labelsFrequencyOfAllEdgePoints[maxPair.first] = 0;
-		}
-
-		// 현재 포인트를 감싸고 있는 레이블을 등록하고 빈도를 1증가시킨다.
-		labelsFrequencyOfAllEdgePoints[maxPair.first]++;
-	}
-
-	// Step 2.
-	// labelsFrequencyOfAllEdgePoints는 edge의 모든 점들이 생각하는 인접 레이블과 그 레이블의 발생빈도를 담고 있다.
-	// Now adjaceLabelOfAllEdgePoints contains adjacent labels of all edge points
-	// 만일, 압도적으로 (kThreshold)이상 차지하는 label이 있다면, 그 레이블은 감싸는 레이블이라고 생각한다.
-	bWrapped = SearchMapForMaxPair(labelsFrequencyOfAllEdgePoints, kThreshold, maxPair);
-
-	// bWrapped가 true라면, maxPair.first에는 감싸고 있는 클러스터의 레이블이 담긴다.
-	out_labelOfWrapperCluster = maxPair.first;
-	return bWrapped;
-}
-void GetAllAdjacentLabelsAndTheirFrequency(const Cluster& in_cluster, const cv::Mat& in_labelMap, int in_rangeToCover, std::unordered_map<int, int> &out_labelAndItsFrequency, std::vector<cv::Point>& out_minusPoints)
-{
-	std::vector<cv::Point> allEdgePoints;
-	std::pair<int, int> maxPair;
-
-	// Cluster의 Outer Contour를 이루고 있는 모든 점들을 구한다.
-	FindAllOuterPointsOfCluster(in_labelMap.size(), in_cluster, allEdgePoints);
-
-	// Step 1. 
-	// Search all edge points for the adjacent clusters
-	// Edge상에 존재하는 모든 점들에 대하여 생각한다.
-	for (const cv::Point& eachPoint : allEdgePoints)
-	{
-		cv::Point targetPoint;
-		std::unordered_map<int, int> frequencyOfLabels; // Key = Label, Value = # of occurence
-
-											  // 한 Point를 기준으로 [in_rangeToCover x in_rangeToCover]의 영역을 생각한다.
-		for (int rowIndex = -in_rangeToCover; rowIndex <= in_rangeToCover; ++rowIndex)
-		{
-			targetPoint.y = eachPoint.y + rowIndex;
-
-			for (int colIndex = -in_rangeToCover; colIndex <= in_rangeToCover; ++colIndex)
-			{
-				targetPoint.x = eachPoint.x + colIndex;
-
-				int adjacentLabel = in_labelMap.at<int>(targetPoint);
-
-				// if adjacentLabel is certainly outer part of the cluster (in_cluster)
-				if (!in_cluster.DoesContain(adjacentLabel))
-				{
-					if (frequencyOfLabels.count(adjacentLabel) == 0)
-					{
-						frequencyOfLabels[adjacentLabel] = 0;
-					}
-					frequencyOfLabels[adjacentLabel]++;
-				}
-
-				if (adjacentLabel == NOT_CLUSTER_LABEL && std::find(out_minusPoints.begin(), out_minusPoints.end(), targetPoint) == out_minusPoints.end())
-				{
-					out_minusPoints.push_back(targetPoint);
-				}
-			}
-		}
-
-		// eachPoint를 둘러싸는 클러스터중 가장 비중이 큰 녀석을 구해 maxPair에 저장한다. 
-		// maxPair의 key값은 레이블이고 value는 등장 횟수이다.
-		SearchMapForMaxPair(frequencyOfLabels, 0, maxPair);
-
-		// 기존에 없다면 등록
-		if (out_labelAndItsFrequency.count(maxPair.first) == 0)
-		{
-			out_labelAndItsFrequency[maxPair.first] = 0;
-		}
-
-		// 현재 포인트를 감싸고 있는 레이블의 빈도를 1증가시킨다.
-		out_labelAndItsFrequency[maxPair.first]++;
-	}
 }
 
 /**************************************************/
@@ -719,119 +420,6 @@ void FindBiggestCluster(const std::unordered_map<int, Cluster>& in_clusters, int
 	out_biggestClusterLabel = maxLabel;
 }
 
-void PerformColorMergingTask(const Cluster & in_seedCluster, const std::unordered_map<int, Cluster>& in_clusters,
-	const cv::Mat& in_lValueDividedHSVMat, cv::Mat& inout_labelMap,
-	const double in_lValudDivider, const std::set<int>& in_backgroundIndices, const cv::Size& in_limitBox, int in_maxTrial, Cluster& out_mergedCluster)
-{
-	// Seed Cluster를 중심으로 확장 시켜야 한다.
-	auto &seedColorInHSV = in_seedCluster.GetHSVColor();
-	// 점점 확장해 나갈 ROI (extendedRect)
-	auto extendedRect = in_seedCluster.GetBoundedBox();
-	out_mergedCluster = in_seedCluster;
-
-	// SeedCluster의 HSV Color를 구해서 hsvColorOfSeedCluster에 저장한다.
-	cv::Point3i originalHSVColorOfSeedCluster;
-	// hsvColorOfSeedCluster는 Seed Cluster의 색상을 담고있다.
-	GetOriginalHSVColorFromHalfedLuv(in_seedCluster.GetLuvColor(), in_lValudDivider, originalHSVColorOfSeedCluster);
-
-	// 병합을 시도했었던 레이블들을 기록.
-	std::set<int> triedLabelsSet;
-
-	// Region Merging 작업
-	while (true)
-	{
-		std::set<int> labelsOfAdjacentRegions;
-		std::set<int> labelsOfSimilarRegions;
-
-		// mainCluster에 인접한 영역들을 구한다. 
-		// 다만, mainCluster의 외부이며 extendedRect내부에서만 인접한 영역을 탐색한다.
-		GetLabelsOfAdjacentClusters(inout_labelMap, in_seedCluster, extendedRect, labelsOfAdjacentRegions);
-		for (auto eachLabel : labelsOfAdjacentRegions)
-		{
-			if (triedLabelsSet.count(eachLabel) == 0)
-			{
-				triedLabelsSet.insert(eachLabel);
-			}
-			else
-			{
-				// 이전에 병합을 시도했었던 레이블이므로, Pass
-				continue;
-			}
-
-			// 백 그라운드 클러스터 OR 소규모 클러스터들은 병합대상이 아니다.
-			if (in_backgroundIndices.count(eachLabel) || eachLabel == NOT_CLUSTER_LABEL)
-			{
-				continue;
-			}
-
-			// 검은색끼리 머징하는 방법. seedRegion의 L값이 20보다 작고 인접하다고 생각되는 영역의 L값이 20보다 작으면,
-			// 둘다 모두 검은색 영역이므로 합친다.
-			if (in_seedCluster.GetLuvColor().x <= 20 && in_clusters.at(eachLabel).GetLuvColor().x <= 20)
-			{
-				labelsOfSimilarRegions.insert(eachLabel);
-				continue;
-			}
-
-			cv::Point3i hsvColorOfAdjacentCluster;
-			GetOriginalHSVColorFromHalfedLuv(in_clusters.at(eachLabel).GetLuvColor(), in_lValudDivider, hsvColorOfAdjacentCluster);
-
-			// 채도값을 비교(둘다 S가 20보다 작고 V가 100보다 큰 경우)해서 
-			// 둘다 어느정도 비슷한 회색계열이면 그림자로 취급하고 합친다.
-			if ((originalHSVColorOfSeedCluster.z >= 100 && hsvColorOfAdjacentCluster.z >= 100) && (originalHSVColorOfSeedCluster.y <= 20 && hsvColorOfAdjacentCluster.y <= 20))
-			{
-				labelsOfSimilarRegions.insert(eachLabel);
-				continue;
-			}
-
-			// disSimilarity 값이 0에 가까울 수록 유사하다. Bhattacharyya Coefficient를 계산.
-			// 원래 Lvalud Divided HSV를 사용하였음..
-			auto hueDissimilarity = GetHSVBhattaCoefficient(in_lValueDividedHSVMat, in_clusters.at(eachLabel), in_seedCluster, 0, 30);
-			auto satDissimilarity = GetHSVBhattaCoefficient(in_lValueDividedHSVMat, in_clusters.at(eachLabel), in_seedCluster, 1, 16);
-			auto valueDissimilarity = GetHSVBhattaCoefficient(in_lValueDividedHSVMat, in_clusters.at(eachLabel), in_seedCluster, 2, 4);
-
-			// 가장 먼저, 색상이 비슷한지를 따져보자.
-			// 색상이 비슷하다면, 그다음에는 명도, 채도를 순서로 따져본다.
-			if (hueDissimilarity < 0.30)
-			{
-				// Hue값은 동일하나, 명도가 아주 차이나는 경우가 있다. (흰색, 검은색)
-				// 그런 경우에는, 병합의 대상으로 생각하지 않는다.
-				// 또한 채도가 일정수준 이상 차이 나버리면, 동일한 색상으로 보지않도록 한다.
-				if (valueDissimilarity <= 0.9 && satDissimilarity <= 0.9)
-				{
-					// 현재 mainCluster와 비슷한 클러스터들의 레이블을 기록해놓는다.
-					labelsOfSimilarRegions.insert(eachLabel);
-				}
-			}
-		}
-
-		// 더이상 합칠 클러스터가 없다면, nTrial을 감소시키고 ROI(extendedRect) 또한 증가시킨다.
-		if (labelsOfSimilarRegions.size() == 0)
-		{
-			if (in_maxTrial > 0)
-			{
-				ExpandRectInAnyFourDirections(in_limitBox, extendedRect, -10, -10, 20, 20);
-				in_maxTrial--;
-			}
-			else
-			{
-				break;
-			}
-		}
-
-		// 합칠 인접영역이 있다면 합치고, nTrial은 3으로 다시 원복!
-		else
-		{
-			for (auto similarRegionLabel : labelsOfSimilarRegions)
-			{
-				// mainCluster에 clusters[similarRegionLabel]을 합병시킨다.
-				// 그 결과, mainCluster.m_labels에는 similarRegionLabel이 추가된다.
-				out_mergedCluster.Consume(in_clusters.at(similarRegionLabel));
-			}
-			in_maxTrial = 3;
-		}
-	}
-}
-
 template <typename T>
 static int FindMaxIndexInArray(std::vector<T> &in_vector, int in_totalSize)
 {
@@ -854,17 +442,16 @@ static int FindMaxIndexInArray(std::vector<T> &in_vector, int in_totalSize)
 /*****************************************************/
 
 #pragma optimize("gpsy", off)
-void FindPossibleDefectAreas(const cv::Mat &in_imageMat, const std::vector<cv::Point>& in_contourOfSearchArea, std::vector<cv::Point> &out_detectedArea)
+void CaclculateEdgeMap(const cv::Mat &in_imageMat, cv::Mat& out_edgeMap)
 {
-	// in_contourOfSearchArea에서 결함 부위들을 찾는다.
-	//cv::SimpleBlobDetector::Params blobDetectorParam
+	// out_edgeMap은 gradient magnitude map과 같다.
 	cv::Mat copiedBlurImage;
 	GaussianBlur(in_imageMat, copiedBlurImage, cv::Size(3, 3), 0, 0, BORDER_DEFAULT);
 	cv::cvtColor(copiedBlurImage, copiedBlurImage, CV_BGR2GRAY);
 
 	cv::Mat grad_x, grad_y;
 	cv::Mat abs_grad_x, abs_grad_y;
-	cv::Mat grad;
+	//cv::Mat grad;
 
 	cv::Sobel(copiedBlurImage, grad_x, CV_16S, 1, 0, 3);
 	cv::Sobel(copiedBlurImage, grad_y, CV_16S, 0, 1, 3);
@@ -872,21 +459,9 @@ void FindPossibleDefectAreas(const cv::Mat &in_imageMat, const std::vector<cv::P
 	cv::convertScaleAbs(grad_x, abs_grad_x);
 	cv::convertScaleAbs(grad_y, abs_grad_y);
 
-	cv::addWeighted(abs_grad_x, 0.2, abs_grad_y, 0.8, 0, grad);
+	cv::addWeighted(abs_grad_x, 0.2, abs_grad_y, 0.8, 0, out_edgeMap);
 
-	for (auto rowIndex = 0; rowIndex < copiedBlurImage.rows; ++rowIndex)
-	{
-		for (auto colIndex = 0; colIndex < copiedBlurImage.cols; ++colIndex)
-		{
-			bool bOutside = (cv::pointPolygonTest(in_contourOfSearchArea, cv::Point2f(colIndex, rowIndex), false) <= 0);
-
-			if (bOutside)
-			{
-				grad.at<uchar>(rowIndex, colIndex) = 0;
-			}
-		}
-	}
-	cv::imshow("Gradient Image", grad);
+	cv::imshow("Gradient Image", out_edgeMap);
 	//cv::inRange(grad, 100, 220, grad);
 }
 #pragma optimize("gpsy", on)
@@ -925,7 +500,7 @@ void FindPossibleDefectAreasUsingBlobDetection(const cv::Mat & in_imageMat, cons
 	param.minInertiaRatio = 0;
 	param.maxInertiaRatio = 0.5;
 	cv::Ptr<cv::SimpleBlobDetector> detector = cv::SimpleBlobDetector::create(param);
-	
+
 	std::vector<cv::KeyPoint> keypoints;
 	detector->detect(testImage, keypoints);
 
@@ -934,8 +509,6 @@ void FindPossibleDefectAreasUsingBlobDetection(const cv::Mat & in_imageMat, cons
 	int a = 30;
 }
 #pragma optimize("gpsy", on)
-
-
 
 #pragma optimize("gpsy", off)
 void GetPointsInContour(const cv::Size& in_imageSize, const std::vector<cv::Point>& in_contour, std::vector<cv::Point>& out_insidePoints)
@@ -957,6 +530,21 @@ void GetPointsInContour(const cv::Size& in_imageSize, const std::vector<cv::Poin
 }
 #pragma optimize("gpsy", on)
 
+#pragma optimize("gpsy", off)
+void UpdateLabelMap(cv::Mat & inout_labelMap, const std::unordered_map<int, Cluster>& in_clusters)
+{
+	for (auto eachCluster : in_clusters)
+	{
+		auto currentLabel = eachCluster.second.GetLabel();
+		const auto& points = eachCluster.second.GetPointsArray();
+
+		for (auto eachPoint : points)
+		{
+			inout_labelMap.at<int>(eachPoint) = currentLabel;
+		}
+	}
+}
+#pragma optimize("gpsy", on)
 
 #pragma optimize("gpsy", off)
 bool ExtractCarBody(const cv::Mat & in_srcImage, const AlgorithmParameter& in_parameter, AlgorithmResult& out_result)
@@ -989,6 +577,62 @@ bool ExtractCarBody(const cv::Mat & in_srcImage, const AlgorithmParameter& in_pa
 	int minThresholdToBeCluster = (int)(originalImage.rows * originalImage.cols * 0.02);
 	PerformClustering(filteredImageMat_luv, cv::Rect(0, 0, originalImage.cols, originalImage.rows), minThresholdToBeCluster, labelMap, clusters);
 
+	const int kNumberOfCandidateClusters = 4;
+	const int kNumberOfRandomSamples = (minThresholdToBeCluster < 200) ? minThresholdToBeCluster : 200;
+	std::vector<int> candidateClusterLabels(kNumberOfCandidateClusters);
+	std::vector<double> candidateClusterMagnitudes(kNumberOfCandidateClusters);
+	std::vector<double> candidateClusterWeights(kNumberOfCandidateClusters);
+	std::vector<double> candidateClusterScores(kNumberOfCandidateClusters);
+
+	// 규모가 큰 #(kNumberOfCandidateClusters)개의 클러스터 레이블을 취득한다.
+	for (const auto& eachCluster : clusters)
+	{
+		int currentLabel = eachCluster.first;
+		int currentSize = eachCluster.second.GetTotalPoints();
+		int i = 0;
+
+		while (i <= (kNumberOfCandidateClusters - 1))
+		{
+			if (currentSize > clusters[candidateClusterLabels[i]].GetTotalPoints())
+			{
+				// move one by one until i becomes 2
+				while (i <= (kNumberOfCandidateClusters - 1))
+				{
+					int temp = candidateClusterLabels[i];
+					candidateClusterLabels[i] = currentLabel;
+					currentLabel = temp;
+					i++;
+				}
+			}
+			i++;
+		}
+	}
+
+	// 각 Cluster들이 이미지 중심으로부터 얼마나 먼지 계산하여, 멀면 멀수록 작은 Guassian Weight를 부여해서
+	// 클러스터의 중요도를 떨어뜨린다 (SeedCluster일 가능성을 낮춘다)
+	auto largerLength = (originalImage.cols > originalImage.rows) ? originalImage.cols : originalImage.rows;
+	const double expCoefficient = -12.5 / pow(largerLength, 2);
+	for (int i = 0; i < kNumberOfCandidateClusters; ++i)
+	{
+		Cluster& currentCandidateCluster = clusters[candidateClusterLabels[i]];
+		int currentCandidateClusterSize = currentCandidateCluster.GetTotalPoints();
+		const auto& currentCandidateClusterPoints = currentCandidateCluster.GetPointsArray();
+
+		candidateClusterMagnitudes[i] = currentCandidateClusterSize;
+
+		double averageDistanceFromCenter = 0.0;
+		// weight를 계산할 때, 클러스터에 속하는 픽셀을 random하게 몇 점 샘플링한다.
+		for (int sampleIndex = 0; sampleIndex < kNumberOfRandomSamples; ++sampleIndex)
+		{
+			cv::Point2d tempPoint = currentCandidateClusterPoints[std::rand() % currentCandidateClusterSize];
+			averageDistanceFromCenter += cv::norm(tempPoint - imageCenter);
+		}
+		averageDistanceFromCenter /= kNumberOfRandomSamples;
+
+		candidateClusterWeights[i] = exp(expCoefficient * pow(averageDistanceFromCenter, 2));
+		candidateClusterScores[i] = candidateClusterWeights[i] * candidateClusterMagnitudes[i];
+	}
+
 #if true
 	cv::Mat filteredImageInBGR;
 	cv::Mat filteredImageInHSV;
@@ -996,119 +640,104 @@ bool ExtractCarBody(const cv::Mat & in_srcImage, const AlgorithmParameter& in_pa
 	cv::cvtColor(filteredImageInBGR, filteredImageInHSV, CV_BGR2HSV);
 #endif
 
-	cv::Mat hsvPlanes[3];
-	cv::Mat LUVPlanes[3];
-	cv::split(filteredImageMat_luv, LUVPlanes);
-	cv::split(filteredImageInHSV, hsvPlanes);
+	/////////////////////////////////
+	////						   //
+	//// 02.  Color Merging		   //
+	////						   //
+	/////////////////////////////////
 
-	const int kHueIntervals = 9;
-	const int kSatIntervals = 16;
-	std::vector<int> hueArray(kHueIntervals);
-	std::vector<int> satArray(kSatIntervals);
+	// 위에서 구한 Measure (Gaussian-based Score)를 바탕으로 seedCluster를 찾는다.
+	int seedClusterIndex = candidateClusterLabels[FindMaxIndexInArray<double>(candidateClusterScores, kNumberOfCandidateClusters)];
 
-	cv::Mat colorMapOfHue;
-	cv::applyColorMap(hsvPlanes[0], colorMapOfHue, COLORMAP_HOT);
-	cv::imshow("Hue Distribution", colorMapOfHue);
+	// 가장 점수가 높은 클러스터를 SeedCluster(차체 중 일부)이다. 
+	// 이제 이 클러스터를 중심으로 색상차이가 얼마 안나는 나머지 Cluster들과 Merging 작업을 시작한다.
+	Cluster &seedCluster = clusters[seedClusterIndex];
+	cv::Point3i seedClusterHSVColor = seedCluster.GetHSVColor();
+	cv::Point3i seedClusterLuvColor = seedCluster.GetLuvColor();
 
-	cv::Mat colorMapOfSat;
-	cv::applyColorMap(hsvPlanes[1], colorMapOfSat, COLORMAP_HOT);
-	cv::imshow("Sat Distribution", colorMapOfSat);
+	// 씨드클러스터와 합쳐질 클러스터들의 레이블을 담는 Set
+	std::set<int> toBeMergedClusterIndices;
+	std::set<int> toBePreservedClusterIndicies;
 
-	// 이미지의 색상 분포를 파악하는데 사용
-	for (int rowIndex = (originalImage.rows / 4) - 1; rowIndex < ((originalImage.rows * 3) / 4); ++rowIndex)
+	// 씨드클러스터와 합쳐질 녀석들을 차례대로 순회하며 확인한다.
+	for (const auto& eachCluster : clusters)
 	{
-		for (int colIndex = (originalImage.cols / 4) - 1; colIndex < ((originalImage.cols * 3) / 4); ++colIndex)
+		// 씨드클러스터는 순회할 필요가 없다.
+		if (eachCluster.second.GetLabel() == seedClusterIndex)
 		{
-			hueArray[(int)(hsvPlanes[0].at<uchar>(rowIndex, colIndex) / (180 / kHueIntervals))]++;
-			satArray[(int)(hsvPlanes[1].at<uchar>(rowIndex, colIndex) / (256 / kSatIntervals))]++;
+			continue;
+		}
+
+		const cv::Point3i& eachClusterHSVColor = eachCluster.second.GetHSVColor();
+		const cv::Point3i& eachClusterLuvColor = eachCluster.second.GetLuvColor();
+
+		// Merging Criteria로 사용할 것임. (HSV값 차이, Luv값 차이)
+		auto hueDiff = std::abs(seedClusterHSVColor.x - eachClusterHSVColor.x);
+		auto satDiff = std::abs(seedClusterHSVColor.y - eachClusterHSVColor.y);
+		auto valDiff = std::abs(seedClusterHSVColor.z - eachClusterHSVColor.z);
+		auto lDiff = std::abs(seedClusterLuvColor.x - eachClusterLuvColor.x);
+		auto uDiff = std::abs(seedClusterLuvColor.y - eachClusterLuvColor.y);
+		auto vDiff = std::abs(seedClusterLuvColor.z - eachClusterLuvColor.z);
+
+		// Merge해도 좋은가? 기록
+		bool bOkayToMerge = false;
+
+		if (hueDiff <= 5 && satDiff <= 10 && valDiff <= 10)
+		{
+			// similar! 
+			bOkayToMerge = true;
+		}
+		else if (hueDiff <= 5 && seedClusterHSVColor.y >= 200 && eachClusterHSVColor.y >= 200 && seedClusterHSVColor.z >= 100 && eachClusterHSVColor.z >= 100)
+		{
+			bOkayToMerge = true;
+		}
+		else if (lDiff <= 50 && uDiff <= 15 && vDiff <= 15)
+		{
+			bOkayToMerge = true;
+		}
+
+		if (bOkayToMerge == true)
+		{
+			toBeMergedClusterIndices.insert(eachCluster.first);
+		}
+		else
+		{
+			toBePreservedClusterIndicies.insert(eachCluster.first);
 		}
 	}
 
-	// 0.65를 넘어서면 이건 흰색 차량이야.
-	float lowSaturationPixelRatio = (float)(satArray[0] + satArray[1]) / (kTotalPixels / 4);
-	cv::Mat lastBinaryImage(originalImage.rows, originalImage.cols, CV_8UC1, cv::Scalar::all(0));
-
-	bool bImageHasLowSaturationCarColor = (lowSaturationPixelRatio > 0.65);
-
-	// 이미지에서 대부분의 픽셀이 무채색임. (0.65란 전체이미지 픽셀 중 65%가 0에 가까운 채도이다.)
-	if (bImageHasLowSaturationCarColor)
+	// Merging후 최종 클러스터들 목록
+	std::unordered_map<int, Cluster> finalClusterList;
+	// Merging 되야될 녀석들을 차례대로 씨드클러스터에 넣어준다.
+	for (auto& shouldBeMergedClusterLabel : toBeMergedClusterIndices)
 	{
-		cv::Mat saturationBinaryImage;
-		cv::Mat valueBinaryImage;
-
-		cv::inRange(hsvPlanes[1], 0, 32, saturationBinaryImage);
-		// 명도가 90에서 255사이인 영역을 뽑아내자.
-		cv::threshold(hsvPlanes[2], valueBinaryImage, 90, 255, CV_THRESH_BINARY);
-		// 이미지에서 채도가 낮으면서 명도는 일정 값 이상하는 영역을 가려낸다.
-		// 흰색차량(무채색)의 프레임은 보통 명도가 일정 값 이상이면서 채도가 낮다.
-		lastBinaryImage = saturationBinaryImage & valueBinaryImage;
-
-		cv::medianBlur(lastBinaryImage, lastBinaryImage, 7);
+		seedCluster.Consume(clusters[shouldBeMergedClusterLabel]);
 	}
 
-	// 채색 (색이 있는!) 차량이면
-	// 채도가 있음 (고채도 ==> 선명한 색 ==> 파란색, 하늘색 등)
-	else if (lowSaturationPixelRatio < 0.3)
+	// 보존되야할 녀석들을 최종 클러스터 목록에 저장한다.
+	for (auto& shouldBePreservedClusterLabel : toBePreservedClusterIndicies)
 	{
-		cv::Mat hueThresholdedImage;
-		const float kThresholdPercentageToBeMajorHue = 0.6;
-
-		// 이미지에서 가장 주된 Hue값은 무엇인지 구하자.
-		auto maxHueIndex = FindMaxIndexInArray<int>(hueArray, hueArray.size());
-		// 그 주된 Hue값이 60%이상을 차지하는 Major한 Hue값인지 판단
-		bool bIsThisHueMajority = (float)(hueArray[maxHueIndex] / (kTotalPixels / 4)) > kThresholdPercentageToBeMajorHue;
-
-		if (true)
-		{
-			cv::inRange(hsvPlanes[0], maxHueIndex * (180 / kHueIntervals), (maxHueIndex + 1) * (180 / kHueIntervals), hueThresholdedImage);
-			// To reduce noise.
-			cv::medianBlur(hueThresholdedImage, hueThresholdedImage, 5);
-			lastBinaryImage = hueThresholdedImage;
-		}
+		finalClusterList[shouldBePreservedClusterLabel] = clusters[shouldBePreservedClusterLabel];
 	}
-	else
-	{
-		lastBinaryImage.release();
-	}
+	// 씨드도 저장한다.
+	finalClusterList[seedCluster.GetLabel()] = seedCluster;
+	UpdateLabelMap(labelMap, finalClusterList);
 
-	if (lastBinaryImage.data)
-	{
-		std::vector<std::vector<cv::Point>> contours;
-		cv::findContours(lastBinaryImage, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_NONE);
+	cv::Mat edgeMat;
+	CaclculateEdgeMap(originalImage, edgeMat);
 
-		int currentMax = 0;
-		int currentMaxIndex = 0;
-		for (int i = 0; i < contours.size(); ++i)
-		{
-			if (currentMax < contours[i].size())
-			{
-				currentMax = contours[i].size();
-				currentMaxIndex = i;
-			}
-		}
-		cv::imshow("Binary Image", lastBinaryImage);
+	DrawOuterContourOfCluster(originalImage, seedCluster, cv::Scalar(255, 255, 0));
+	cv::imshow("Contour Image", originalImage);
 
-		std::vector<cv::Point> insidePoints;
-		std::vector<cv::Point> defectAreas;
-		//GetPointsInContour(cv::Size(originalImage.cols, originalImage.rows), contours[currentMaxIndex], insidePoints);
-		FindPossibleDefectAreas(originalImage, contours[currentMaxIndex], defectAreas);
-		FindPossibleDefectAreasUsingBlobDetection(originalImage, defectAreas);
-		cv::drawContours(originalImage, contours, currentMaxIndex, cv::Scalar(255, 255, 0), 4);
-
-	}
-	//FindPossibleDefectAreas ()
-
-	//std::vector<cv::KeyPoint> keypoints;
-	//cv::SimpleBlobDetector::Params params = SimpleBlobDetector::Params();
+	//FindPossibleDefectAreas(originalImage)
 
 	// 레이블맵을 컬러매핑해서 Visualize한다
-	//cv::Mat colorLabelMap;
-	//cv::normalize(labelMap, colorLabelMap, 0, 255, NORM_MINMAX);
-	//colorLabelMap.convertTo(colorLabelMap, CV_8UC1);
-	//cv::applyColorMap(colorLabelMap, colorLabelMap, COLORMAP_JET);
-	//cv::imshow("Color Map", colorLabelMap);
-
-	cv::imshow("Result", originalImage);
+	cv::Mat colorLabelMap;
+	cv::normalize(labelMap, colorLabelMap, 0, 255, NORM_MINMAX);
+	colorLabelMap.convertTo(colorLabelMap, CV_8UC1);
+	cv::applyColorMap(colorLabelMap, colorLabelMap, COLORMAP_JET);
+	cv::imshow("Color Map", colorLabelMap);
+	
 	return true;
 }
 #pragma optimize("gpsy", on)
