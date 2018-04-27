@@ -195,44 +195,26 @@ private:
 /************************************************************************/
 /**************			Clinet Functions					*************/
 /************************************************************************/
-
 // 입력된 이미지에서, 바디부분만 뽑아낸다.
 bool ExtractCarBody(const cv::Mat& in_srcImage, const AlgorithmParameter& in_parameter, AlgorithmResult& out_finalParameter);
-
 
 /************************************************************************/
 /**************			Internal Functions					*************/
 /************************************************************************/
-
-// in_limitBox의 테두리를 넘지 않는 선에서, in_rect를 (offsetX, offsetY)만큼 평행이동하며, diffWidth, diffHeight만큼 in_rect의 너비, 높이를 변화시킨다.
-void ExpandRectInAnyFourDirections(cv::Size in_limitBox, cv::Rect& in_rect, int offsetX, int offsetY, int diffWidth, int diffHeight);
-
-// in_cluster1의 색상 분포와 in_cluster2의 색상 분포를 비교하여 Bhattacharyya Coefficient를 구한다. 0에 가까울 수록 유사하다.
-double GetHSVBhattaCoefficient(const cv::Mat& in_referenceLuvImage, const Cluster &in_cluster1, const Cluster &in_cluster2, int channelNumber, int in_nBin);
-
 // mean shift filtering된 이미지의 in_ROI 영역에서 clustering을 수행한다. 
 void PerformClustering(cv::Mat& in_luvWholeImage, const cv::Rect& in_ROI, int in_thresholdToBeCluster, cv::Mat& out_labelMap, std::unordered_map<int, Cluster>& out_clusters);
 
-// 지정된 ROI(in_ROI)에서 가장 비중이 큰 클러스터의 레이블을 찾아 리턴한다.
-void FindSeedClusterInROI(const cv::Mat &in_labelMap, const std::set<int> &in_backgroundIndices, const cv::Rect& in_ROI, int& out_seedLabel);
-
-// 백그라운드 클러스터들의 레이블을 얻는다. 결과는 out_backgroundIndicesSet에 저장된다.
-void GetBackgroundClusterIndices(const cv::Size &in_originalImageSize, const cv::Mat &in_labelMap, int in_marginLegnth, std::set<int> &out_backgroundIndiciesSet);
-
-/************************************************************************/
-/**************			Utility Functions					*************/
-/************************************************************************/
-// 주어진 이미지 (in_givenImage)에서 폐구간 (in_range)에 해당하는 값이 존재하면 그곳을 모두 255로 채운다. 만일, bInversion이 true이면 반전시킨다.
-void ThresholdImageWithinCertainInterval(cv::Mat& in_givenImage, std::vector<int>& in_range, bool bInversion, cv::Mat& out_binaryImage);
-
-// 주어진 결함 탐색영역(외곽선으로 주어짐)에서 결함을 검출한다.
+// 입력받은 이미지에서 EdgeMap을 만들어준다.
 void CaclculateEdgeMap(const cv::Mat &in_imageMat, cv::Mat& out_edgeMap);
 
+// Blob Detection을 통해 결함이 있을만한 영역을 찾는다.
 void FindPossibleDefectAreasUsingBlobDetection(const cv::Mat &in_imageMat, const std::vector<cv::Point> &out_centerPointsOfPossibleAreas);
 
+// Contour안에 존재하는 Points들을 얻는다.
 void GetPointsInContour(const cv::Size& in_imageSize, const std::vector<cv::Point> &in_contour, std::vector<cv::Point> &out_insidePoints);
 
-void UpdateLabelMap(cv::Mat& inout_labelMap, const std::unordered_map<int, Cluster>& in_clusters);
+// in_cluster (입력받은 클러스터)를 기준으로 Label Map을 업데이트 한다. 
+void UpdateLabelMap(const std::unordered_map<int, Cluster>& in_clusters, cv::Mat& inout_labelMap);
 
 // 클러스터들의 Contour를 그린다.
 void DrawContoursOfClusters(cv::Mat & in_targetImage, const std::unordered_map<int, Cluster>& in_clusters, cv::Scalar in_color);
@@ -240,7 +222,7 @@ void DrawContoursOfClusters(cv::Mat & in_targetImage, const std::unordered_map<i
 void DrawOuterContourOfCluster(cv::Mat &in_targetImage, const Cluster& in_cluster, cv::Scalar in_color);
 // 사각형이 원본 이미지의 영역에서 벗어났는지 확인한다.
 bool IsOutOfRange(const cv::Mat &in_originalImage, const cv::Rect &in_rect);
-// 입력받은 맵(in_map)에서 Value가 최대인 녀석을 찾되, value가 kCriteria보다 큰 녀석을 찾는다. 만일 없다면 false를 반환한다.
+// 입력받은 맵(in_map)에서 Value가 최대인 녀석을 찾되, value가 kMinimumValue보다 큰 녀석을 찾는다. 만일 없다면 false를 반환한다.
 bool SearchMapForMaxPair(const std::unordered_map<int, int>& in_map, const int kMinimumValue, std::pair<int, int> &out_keyValuePair);
 // 이게 CreateAlphaMap함수를 내부적으로 호출함.
 void FindAllOuterPointsOfCluster(const cv::Size& in_frameSize, const Cluster &in_cluster, std::vector<cv::Point> &out_points);
@@ -248,6 +230,19 @@ void FindAllOuterPointsOfCluster(const cv::Size& in_frameSize, const Cluster &in
 void CreateAlphaMapFromCluster(const cv::Size& in_alphaMapSize, const Cluster& in_cluster, cv::Mat& out_alphaMap);
 // Cluster 내부 Point들의 색상을 모두 out_mat에 뿌려준다. 
 void ProjectClusterIntoMat(const Cluster& in_cluster, cv::Mat &out_mat);
-
 // in_clusters 내부에서 가장 큰 규모의 Cluster를 구하고 그 레이블을 저장한다.
 void FindBiggestCluster(const std::unordered_map<int, Cluster>& in_clusters, int& out_biggestClusterIndex);
+
+// Color Merging을 하도록 한다.
+void PerformColorMergingFromSeedClusterAndUpdateClusterList(std::unordered_map <int, Cluster> &in_updatedClusterList, const int in_seedIndex);
+
+void Find_TopN_BiggestClusters(const std::unordered_map<int, Cluster> &in_clusters, const int in_count, std::vector<int> &out_labels);
+
+void GetAdequacyScoresToBeSeed(const cv::Size in_imageSize,
+	const std::unordered_map<int, Cluster> &in_clusters,
+	const int in_numberOfCandidates,
+	const int in_numberOfRandomSamples,
+	const std::vector<int> in_candidateClusterLabels,
+	int& out_seedLabel);
+
+void VisualizeLabelMap(const cv::Mat& in_labelMap, cv::Mat& out_colorLabelMap);

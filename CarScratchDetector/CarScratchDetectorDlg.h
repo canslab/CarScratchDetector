@@ -44,4 +44,8 @@ public:
 	afx_msg void OnBnClickedSaveresultbtn();
 	CEdit m_spatialRadiusEditBox;
 	CEdit m_colorRadiusEditBox;
+	CButton m_bCheckEdgeMap;
+	CButton m_bCheckLabelMap;
+	CButton m_bCheckCornerMap;
+	afx_msg void OnBnClickedAnalyze();
 };

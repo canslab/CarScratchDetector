@@ -28,6 +28,9 @@ void CCarScratchDetectorDlg::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_INPUTIMAGEHEIGHT, m_imageHeightText);
 	DDX_Control(pDX, IDC_SPATIALRADIUSEDIT, m_spatialRadiusEditBox);
 	DDX_Control(pDX, IDC_COLORRADIUSEDIT, m_colorRadiusEditBox);
+	DDX_Control(pDX, IDC_EDGEMAPCHECK, m_bCheckEdgeMap);
+	DDX_Control(pDX, IDC_LABELMAPCHECK, m_bCheckLabelMap);
+	DDX_Control(pDX, IDC_CORNERMAPCHECK, m_bCheckCornerMap);
 }
 
 BEGIN_MESSAGE_MAP(CCarScratchDetectorDlg, CDialogEx)
@@ -37,6 +40,7 @@ BEGIN_MESSAGE_MAP(CCarScratchDetectorDlg, CDialogEx)
 	ON_BN_CLICKED(IDC_SHOWBODYPART, &CCarScratchDetectorDlg::OnBnClickedShowbodypart)
 	ON_BN_CLICKED(IDC_RUNBUTTON, &CCarScratchDetectorDlg::OnBnClickedRunbutton)
 	ON_BN_CLICKED(IDC_SAVERESULTBTN, &CCarScratchDetectorDlg::OnBnClickedSaveresultbtn)
+	ON_BN_CLICKED(IDC_ANALYZE, &CCarScratchDetectorDlg::OnBnClickedAnalyze)
 END_MESSAGE_MAP()
 // CCarScratchDetectorDlg 메시지 처리기
 
@@ -185,4 +189,10 @@ void CCarScratchDetectorDlg::OnBnClickedSaveresultbtn()
 	{
 		MessageBox("Experiment Result doesn't exist");
 	}
+}
+
+void CCarScratchDetectorDlg::OnBnClickedAnalyze()
+{
+	// TODO: Add your control notification handler code here
+	
 }
