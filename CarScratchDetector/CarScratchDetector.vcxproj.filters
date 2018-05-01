@@ -48,14 +48,14 @@
     <ClInclude Include="AlgorithmCode\AlgorithmCollection.h">
       <Filter>AlgorithmCode\Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="AlgorithmCode\Cluster.h">
-      <Filter>AlgorithmCode\Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="CarNumberRemoveCode\ConnectedComponent.h">
       <Filter>AlgorithmCode\NumberRemoveCode</Filter>
     </ClInclude>
     <ClInclude Include="CarNumberRemoveCode\LPdetection.h">
       <Filter>AlgorithmCode\NumberRemoveCode</Filter>
+    </ClInclude>
+    <ClInclude Include="AlgorithmCode\MeanShiftCluster.h">
+      <Filter>AlgorithmCode\Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -74,14 +74,14 @@
     <ClCompile Include="AlgorithmCode\AlgorithmCollection.cpp">
       <Filter>AlgorithmCode</Filter>
     </ClCompile>
-    <ClCompile Include="AlgorithmCode\Cluster.cpp">
-      <Filter>AlgorithmCode</Filter>
-    </ClCompile>
     <ClCompile Include="CarNumberRemoveCode\ConnectedComponent.cpp">
       <Filter>AlgorithmCode\NumberRemoveCode</Filter>
     </ClCompile>
     <ClCompile Include="CarNumberRemoveCode\LPdetection.cpp">
       <Filter>AlgorithmCode\NumberRemoveCode</Filter>
+    </ClCompile>
+    <ClCompile Include="AlgorithmCode\MeanShiftCluster.cpp">
+      <Filter>AlgorithmCode</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

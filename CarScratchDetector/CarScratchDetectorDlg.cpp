@@ -28,19 +28,24 @@ void CCarScratchDetectorDlg::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_INPUTIMAGEHEIGHT, m_imageHeightText);
 	DDX_Control(pDX, IDC_SPATIALRADIUSEDIT, m_spatialRadiusEditBox);
 	DDX_Control(pDX, IDC_COLORRADIUSEDIT, m_colorRadiusEditBox);
-	DDX_Control(pDX, IDC_EDGEMAPCHECK, m_bCheckEdgeMap);
+	//  DDX_Control(pDX, IDC_EDGEMAPCHECK, m_bCheckEdgeMap);
 	DDX_Control(pDX, IDC_LABELMAPCHECK, m_bCheckLabelMap);
 	DDX_Control(pDX, IDC_CORNERMAPCHECK, m_bCheckCornerMap);
+	//  DDX_Control(pDX, IDC_ANALYZE, m_anaylzeButton);
+	//  DDX_Control(pDX, IDC_BODYMAPCHECK, m_bBodyMap);
+	//  DDX_Control(pDX, IDC_CONTOURMAPCHECK, m_bCheckBodyMap);
+	DDX_Control(pDX, IDC_CONTOURMAPCHECK, m_bCheckContourMap);
+	DDX_Control(pDX, IDC_GRADIENTMAPCHECK, m_bGradientMapCheck);
 }
 
 BEGIN_MESSAGE_MAP(CCarScratchDetectorDlg, CDialogEx)
 	ON_WM_PAINT()
 	ON_WM_QUERYDRAGICON()
 	ON_BN_CLICKED(IDC_OPENIMAGEFILEBTN, &CCarScratchDetectorDlg::OnBnClickedOpenimagefilebtn)
-	ON_BN_CLICKED(IDC_SHOWBODYPART, &CCarScratchDetectorDlg::OnBnClickedShowbodypart)
 	ON_BN_CLICKED(IDC_RUNBUTTON, &CCarScratchDetectorDlg::OnBnClickedRunbutton)
 	ON_BN_CLICKED(IDC_SAVERESULTBTN, &CCarScratchDetectorDlg::OnBnClickedSaveresultbtn)
-	ON_BN_CLICKED(IDC_ANALYZE, &CCarScratchDetectorDlg::OnBnClickedAnalyze)
+	ON_BN_CLICKED(IDC_ANALYZEBTN, &CCarScratchDetectorDlg::OnBnClickedAnalyze)
+	ON_BN_CLICKED(IDC_CLEARBTN, &CCarScratchDetectorDlg::OnBnClickedClearbtn)
 END_MESSAGE_MAP()
 // CCarScratchDetectorDlg 메시지 처리기
 
@@ -56,6 +61,19 @@ BOOL CCarScratchDetectorDlg::OnInitDialog()
 	// TODO: 여기에 추가 초기화 작업을 추가합니다.	
 	m_spatialRadiusEditBox.SetWindowTextA("10");
 	m_colorRadiusEditBox.SetWindowTextA("16");
+
+	// Anaylze에 해당하는 체크 박스 현재 상태
+	m_bCheckCornerMap.SetCheck(0);
+	m_bCheckLabelMap.SetCheck(0);
+	m_bCheckContourMap.SetCheck(0);
+	m_bGradientMapCheck.SetCheck(0);
+	
+	GetDlgItem(IDC_ANALYZEBTN)->EnableWindow(FALSE);
+	GetDlgItem(IDC_RUNBUTTON)->EnableWindow(FALSE);
+	GetDlgItem(IDC_CLEARBTN)->EnableWindow(FALSE);
+	GetDlgItem(IDC_SAVERESULTBTN)->EnableWindow(FALSE);
+	//GetDlgItem(IDC_ANA)
+	//GetDlgItem(IDC_ANALYZE)
 
 	return TRUE;  // 포커스를 컨트롤에 설정하지 않으면 TRUE를 반환합니다.
 }
@@ -135,10 +153,15 @@ void CCarScratchDetectorDlg::OnBnClickedOpenimagefilebtn()
 		}
 
 		// If input image exists
-		if (m_srcMat.rows > 0)
+		if (m_srcMat.data)
 		{
 			m_imageWidthText.SetWindowTextA(std::to_string(m_srcMat.cols).c_str());
 			m_imageHeightText.SetWindowTextA(std::to_string(m_srcMat.rows).c_str());
+			GetDlgItem(IDC_OPENIMAGEFILEBTN)->EnableWindow(FALSE);
+			GetDlgItem(IDC_ANALYZEBTN)->EnableWindow(TRUE);
+			GetDlgItem(IDC_RUNBUTTON)->EnableWindow(TRUE);
+			GetDlgItem(IDC_CLEARBTN)->EnableWindow(TRUE);
+			GetDlgItem(IDC_SAVERESULTBTN)->EnableWindow(TRUE);
 		}
 		cv::imshow("Input Image", m_srcMat);
 	}
@@ -146,8 +169,14 @@ void CCarScratchDetectorDlg::OnBnClickedOpenimagefilebtn()
 
 void CCarScratchDetectorDlg::OnBnClickedShowbodypart()
 {
+
+}
+
+void CCarScratchDetectorDlg::OnBnClickedRunbutton()
+{
 	// TODO: Add your control notification handler code here
 	//ExtractCarBody
+
 	AlgorithmParameter param;
 	AlgorithmResult result;
 
@@ -155,19 +184,19 @@ void CCarScratchDetectorDlg::OnBnClickedShowbodypart()
 	m_spatialRadiusEditBox.GetWindowTextA(spatialRadiusString);
 	m_colorRadiusEditBox.GetWindowTextA(colorRadiusString);
 
-	param.SetSpatialBandwidth(atof(spatialRadiusString));
-	param.SetColorBandwidth(atof(colorRadiusString));
+	param.m_spatialBandwidth = atof(spatialRadiusString);
+	param.m_colorBandwidth = atof(colorRadiusString);
+	
+	param.m_bGetGradientMap = (bool)IsDlgButtonChecked(IDC_GRADIENTMAPCHECK);
+	param.m_bGetColorLabelMap = (bool)IsDlgButtonChecked(IDC_LABELMAPCHECK);
+	param.m_bGetCornerMap = (bool)IsDlgButtonChecked(IDC_CORNERMAPCHECK);
+	param.m_bGetContouredMap = (bool)IsDlgButtonChecked(IDC_CONTOURMAPCHECK);
 
 	if (m_srcMat.data != nullptr)
 	{
 		ExtractCarBody(m_srcMat, param, result);
+		GetDlgItem(IDC_ANALYZEBTN)->EnableWindow(TRUE);
 	}
-}
-
-void CCarScratchDetectorDlg::OnBnClickedRunbutton()
-{
-	// TODO: Add your control notification handler code here
-
 }
 
 void CCarScratchDetectorDlg::OnBnClickedSaveresultbtn()
@@ -195,4 +224,23 @@ void CCarScratchDetectorDlg::OnBnClickedAnalyze()
 {
 	// TODO: Add your control notification handler code here
 	
+}
+
+void CCarScratchDetectorDlg::OnBnClickedClearbtn()
+{
+	// TODO: Add your control notification handler code here
+	if (m_srcMat.data)
+	{
+		m_srcMat.release();
+		GetDlgItem(IDC_OPENIMAGEFILEBTN)->EnableWindow(TRUE);
+		GetDlgItem(IDC_ANALYZEBTN)->EnableWindow(FALSE);
+		GetDlgItem(IDC_RUNBUTTON)->EnableWindow(FALSE);
+		GetDlgItem(IDC_CLEARBTN)->EnableWindow(FALSE);
+		GetDlgItem(IDC_SAVERESULTBTN)->EnableWindow(FALSE);
+
+		m_imageHeightText.SetWindowTextA("N/A");
+		m_imageWidthText.SetWindowTextA("N/A");
+
+		cv::destroyAllWindows();
+	}
 }

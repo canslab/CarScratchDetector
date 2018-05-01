@@ -188,7 +188,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="AlgorithmCode\AlgorithmCollection.h" />
-    <ClInclude Include="AlgorithmCode\Cluster.h" />
+    <ClInclude Include="AlgorithmCode\MeanShiftCluster.h" />
     <ClInclude Include="CarNumberRemoveCode\ConnectedComponent.h" />
     <ClInclude Include="CarNumberRemoveCode\LPdetection.h" />
     <ClInclude Include="CarScratchDetector.h" />
@@ -200,7 +200,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="AlgorithmCode\AlgorithmCollection.cpp" />
-    <ClCompile Include="AlgorithmCode\Cluster.cpp" />
+    <ClCompile Include="AlgorithmCode\MeanShiftCluster.cpp" />
     <ClCompile Include="CarNumberRemoveCode\ConnectedComponent.cpp" />
     <ClCompile Include="CarNumberRemoveCode\LPdetection.cpp" />
     <ClCompile Include="CarScratchDetector.cpp" />

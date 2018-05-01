@@ -9,91 +9,62 @@
 #endif
 
 // Class forward declartion
-class Cluster;
+class MeanShiftCluster;
 
 struct AlgorithmParameter
 {
-private:
+public:
 	// Mean Shift 하기 이전에 L값을 몇 배로 나눌지 결정하는 숫자
 	double m_lValueDivider;
 
 	// Mean Shift Segmentation 관련 파라미터
 	double m_spatialBandwidth;
 	double m_colorBandwidth;
-		
-	// 클러스터 이미지도 만들것인지
-	bool m_bGetClusterImage;
-
 	// 민쉬프트 세그멘테이션 결과도 구할 것인지
 	bool m_bGetMeanShiftSegmentationResult;
+		
+	// 컬러 레이블맵을 얻을 것인지
+	bool m_bGetColorLabelMap;
+
+	// 그래디언트 magnitude 이미지를 얻을 것인지
+	bool m_bGetGradientMap;
+
+	bool m_bGetCornerMap;
+
+	// 컨투어가 있는 이미지를 얻을 것인지
+	bool m_bGetContouredMap;
 
 public:
-	void SetLValueDivider(double in_valueDivider)
-	{
-		m_lValueDivider = in_valueDivider;
-	}
-	void SetSpatialBandwidth(double in_sp)
-	{
-		m_spatialBandwidth = in_sp;
-	}
-	void SetColorBandwidth(double in_sr)
-	{
-		m_colorBandwidth = in_sr;
-	}
-	void SetToGetClusterImage(bool in_bSet)
-	{
-		m_bGetClusterImage = in_bSet;
-	}
-	void SetToGetSegmentedImage(bool in_bSet)
-	{
-		m_bGetMeanShiftSegmentationResult = in_bSet;
-	}
-
-public:
-	void SetParameterValues(double in_lValueDivider, double in_sp, double in_sr, int in_backgroundTolerance, bool in_bGetClusterImage, bool in_bGetMeanShiftSegmentationResult)
+	void SetParameterValues
+	(
+		double in_lValueDivider,
+		double in_sp,
+		double in_sr,
+		bool in_bGetMeanShiftSegmentationResult,
+		bool in_bGetColorLabelMap,
+		bool in_bGetGradientMap,
+		bool in_bGetCornerMap,
+		bool in_bGetContouredMap
+	)
 	{
 		m_lValueDivider = in_lValueDivider;
 		m_spatialBandwidth = in_sp;
 		m_colorBandwidth = in_sr;
-		m_bGetClusterImage = in_bGetClusterImage;
 		m_bGetMeanShiftSegmentationResult = in_bGetMeanShiftSegmentationResult;
+		m_bGetGradientMap = in_bGetGradientMap;
+		m_bGetColorLabelMap = in_bGetColorLabelMap;
+		m_bGetGradientMap = in_bGetGradientMap;
+		m_bGetContouredMap = in_bGetContouredMap;
 	}
-	void Reset()
+	void SetToDefault()
 	{
-		m_lValueDivider = m_spatialBandwidth = m_colorBandwidth = m_bGetClusterImage = m_bGetMeanShiftSegmentationResult = 0;
-	}
-public:
-	inline double GetLValueDivider() const
-	{
-		return m_lValueDivider;
-	}
-	inline double GetSpatialBandwidth() const
-	{
-		return m_spatialBandwidth;
-	}
-	inline double GetColorBandwidth() const
-	{
-		return m_colorBandwidth;
-	}
-	
-	inline bool IsSetToGetClusterImage() const
-	{
-		return m_bGetClusterImage;
-	}
-	inline bool IsSetToGetSegmentedImage() const
-	{
-		return m_bGetMeanShiftSegmentationResult;
-	}
-
-public:
-	// 피부색도 검출할것인지.. (이건 다른 프로젝트때문에 있는 것..)
-	AlgorithmParameter() :m_spatialBandwidth(8), m_colorBandwidth(8), m_lValueDivider(2.5), m_bGetClusterImage(false), m_bGetMeanShiftSegmentationResult(false)
-	{
-	}
-	AlgorithmParameter(double in_lValueDivider, double in_sp, double in_sr, int in_backgroundTolerance, bool in_bGetClusterImage, bool in_bGetMeanShiftSegmentationResult):
-		m_lValueDivider(in_lValueDivider), m_spatialBandwidth(in_sp), m_colorBandwidth(in_sr), m_bGetClusterImage(in_bGetClusterImage), m_bGetMeanShiftSegmentationResult(in_bGetMeanShiftSegmentationResult)
-	{
-
+		m_lValueDivider = 1.0;
+		m_spatialBandwidth = 16;
+		m_colorBandwidth = 16;
+		m_bGetColorLabelMap = false;
+		m_bGetGradientMap = false;
+		m_bGetMeanShiftSegmentationResult = false;
+		m_bGetContouredMap = true;
 	}
 };
 
@@ -202,10 +173,10 @@ bool ExtractCarBody(const cv::Mat& in_srcImage, const AlgorithmParameter& in_par
 /**************			Internal Functions					*************/
 /************************************************************************/
 // mean shift filtering된 이미지의 in_ROI 영역에서 clustering을 수행한다. 
-void PerformClustering(cv::Mat& in_luvWholeImage, const cv::Rect& in_ROI, int in_thresholdToBeCluster, cv::Mat& out_labelMap, std::unordered_map<int, Cluster>& out_clusters);
+void PerformClustering(cv::Mat& in_luvWholeImage, const cv::Rect& in_ROI, int in_thresholdToBeCluster, cv::Mat& out_labelMap, std::unordered_map<int, MeanShiftCluster>& out_clusters);
 
 // 입력받은 이미지에서 EdgeMap을 만들어준다.
-void CaclculateEdgeMap(const cv::Mat &in_imageMat, cv::Mat& out_edgeMap);
+void CaclculateGradientMap(const cv::Mat &in_imageMat, cv::Mat& out_edgeMap);
 
 // Blob Detection을 통해 결함이 있을만한 영역을 찾는다.
 void FindPossibleDefectAreasUsingBlobDetection(const cv::Mat &in_imageMat, const std::vector<cv::Point> &out_centerPointsOfPossibleAreas);
@@ -214,32 +185,32 @@ void FindPossibleDefectAreasUsingBlobDetection(const cv::Mat &in_imageMat, const
 void GetPointsInContour(const cv::Size& in_imageSize, const std::vector<cv::Point> &in_contour, std::vector<cv::Point> &out_insidePoints);
 
 // in_cluster (입력받은 클러스터)를 기준으로 Label Map을 업데이트 한다. 
-void UpdateLabelMap(const std::unordered_map<int, Cluster>& in_clusters, cv::Mat& inout_labelMap);
+void UpdateLabelMap(const std::unordered_map<int, MeanShiftCluster>& in_clusters, cv::Mat& inout_labelMap);
 
 // 클러스터들의 Contour를 그린다.
-void DrawContoursOfClusters(cv::Mat & in_targetImage, const std::unordered_map<int, Cluster>& in_clusters, cv::Scalar in_color);
+void DrawContoursOfClusters(cv::Mat & in_targetImage, const std::unordered_map<int, MeanShiftCluster>& in_clusters, cv::Scalar in_color);
 // 단일 클러스의 Contour를 그린다.
-void DrawOuterContourOfCluster(cv::Mat &in_targetImage, const Cluster& in_cluster, cv::Scalar in_color);
+void DrawOuterContourOfCluster(cv::Mat &in_targetImage, const MeanShiftCluster& in_cluster, cv::Scalar in_color);
 // 사각형이 원본 이미지의 영역에서 벗어났는지 확인한다.
 bool IsOutOfRange(const cv::Mat &in_originalImage, const cv::Rect &in_rect);
 // 입력받은 맵(in_map)에서 Value가 최대인 녀석을 찾되, value가 kMinimumValue보다 큰 녀석을 찾는다. 만일 없다면 false를 반환한다.
 bool SearchMapForMaxPair(const std::unordered_map<int, int>& in_map, const int kMinimumValue, std::pair<int, int> &out_keyValuePair);
 // 이게 CreateAlphaMap함수를 내부적으로 호출함.
-void FindAllOuterPointsOfCluster(const cv::Size& in_frameSize, const Cluster &in_cluster, std::vector<cv::Point> &out_points);
+void FindAllOuterPointsOfCluster(const cv::Size& in_frameSize, const MeanShiftCluster &in_cluster, std::vector<cv::Point> &out_points);
 // 입력받은 클러스터 (in_cluster)의 AlphaMap(out_alphaMap)을 만든다.
-void CreateAlphaMapFromCluster(const cv::Size& in_alphaMapSize, const Cluster& in_cluster, cv::Mat& out_alphaMap);
+void CreateAlphaMapFromCluster(const cv::Size& in_alphaMapSize, const MeanShiftCluster& in_cluster, cv::Mat& out_alphaMap);
 // Cluster 내부 Point들의 색상을 모두 out_mat에 뿌려준다. 
-void ProjectClusterIntoMat(const Cluster& in_cluster, cv::Mat &out_mat);
+void ProjectClusterIntoMat(const MeanShiftCluster& in_cluster, cv::Mat &out_mat);
 // in_clusters 내부에서 가장 큰 규모의 Cluster를 구하고 그 레이블을 저장한다.
-void FindBiggestCluster(const std::unordered_map<int, Cluster>& in_clusters, int& out_biggestClusterIndex);
+void FindBiggestCluster(const std::unordered_map<int, MeanShiftCluster>& in_clusters, int& out_biggestClusterIndex);
 
 // Color Merging을 하도록 한다.
-void PerformColorMergingFromSeedClusterAndUpdateClusterList(std::unordered_map <int, Cluster> &in_updatedClusterList, const int in_seedIndex);
+void PerformColorMergingFromSeedClusterAndUpdateClusterList(std::unordered_map <int, MeanShiftCluster> &in_updatedClusterList, const int in_seedIndex);
 
-void Find_TopN_BiggestClusters(const std::unordered_map<int, Cluster> &in_clusters, const int in_count, std::vector<int> &out_labels);
+void Find_TopN_BiggestClusters(const std::unordered_map<int, MeanShiftCluster> &in_clusters, const int in_count, std::vector<int> &out_labels);
 
 void GetAdequacyScoresToBeSeed(const cv::Size in_imageSize,
-	const std::unordered_map<int, Cluster> &in_clusters,
+	const std::unordered_map<int, MeanShiftCluster> &in_clusters,
 	const int in_numberOfCandidates,
 	const int in_numberOfRandomSamples,
 	const std::vector<int> in_candidateClusterLabels,

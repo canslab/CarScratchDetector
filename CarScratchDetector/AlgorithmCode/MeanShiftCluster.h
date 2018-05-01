@@ -3,7 +3,7 @@
 #include <unordered_map>
 
 // 점들을 보유하는 Cluster 클래스
-class Cluster
+class MeanShiftCluster
 {
 private:
 	// 클러스터 대표 Luv컬러 값
@@ -115,7 +115,7 @@ public:
 
 public:
 	// assignment
-	Cluster& operator=(const Cluster& in_cluster)
+	MeanShiftCluster& operator=(const MeanShiftCluster& in_cluster)
 	{
 		auto &in_rect = in_cluster.m_boundedBox;
 		m_pointsArray = in_cluster.m_pointsArray;	// 이렇게 대입만 해도 Deep Copy가 발생함.
@@ -128,7 +128,7 @@ public:
 	}
 
 	// 복사생성자
-	Cluster(const Cluster& in_cluster)
+	MeanShiftCluster(const MeanShiftCluster& in_cluster)
 	{
 		m_pointsArray = in_cluster.m_pointsArray;
 		this->m_colorInLuv = in_cluster.m_colorInLuv;
@@ -138,14 +138,14 @@ public:
 	}
 
 	// 기본생성자
-	Cluster() :m_pointsArray(0), m_label(-1)
+	MeanShiftCluster() :m_pointsArray(0), m_label(-1)
 	{
 
 	}
 
 public:
 	// in_cluster를 병합한다.
-	void Consume(const Cluster& in_cluster)
+	void Consume(const MeanShiftCluster& in_cluster)
 	{
 		m_pointsArray.insert(m_pointsArray.end(), in_cluster.m_pointsArray.begin(), in_cluster.m_pointsArray.end());
 		this->m_boundedBox = this->m_boundedBox | in_cluster.m_boundedBox;

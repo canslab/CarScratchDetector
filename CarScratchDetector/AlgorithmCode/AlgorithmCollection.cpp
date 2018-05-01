@@ -1,11 +1,11 @@
 #include "AlgorithmCollection.h"
-#include "Cluster.h"
+#include "MeanShiftCluster.h"
 #include "..\UtilityCode\Timer.h"
 #include "..\CarNumberRemoveCode\LPdetection.h" 
 
 #define NOT_CLUSTER_LABEL -1
 
-void PerformClustering(cv::Mat& in_luvWholeImage, const cv::Rect& in_ROI, int in_thresholdToBeCluster, cv::Mat& out_labelMap, std::unordered_map<int, Cluster>& out_clusters)
+void PerformClustering(cv::Mat& in_luvWholeImage, const cv::Rect& in_ROI, int in_thresholdToBeCluster, cv::Mat& out_labelMap, std::unordered_map<int, MeanShiftCluster>& out_clusters)
 {
 	//FloodFillPostprocess_Cluster(in_luvWholeImage, out_labelMap, out_clusters, cv::Scalar::all(1));
 	int kInputImageWidth = in_luvWholeImage.cols;
@@ -65,8 +65,8 @@ void PerformClustering(cv::Mat& in_luvWholeImage, const cv::Rect& in_ROI, int in
 					}
 
 					// 클러스터 컨테이너(unordered_map)에 Cluster를 등록
-					out_clusters[clusterIndex] = Cluster();
-					Cluster& eachCluster = out_clusters[clusterIndex];
+					out_clusters[clusterIndex] = MeanShiftCluster();
+					MeanShiftCluster& eachCluster = out_clusters[clusterIndex];
 					//eachCluster
 
 					// cluster에 본인이 몇 번째 레이블인지 저장.
@@ -91,7 +91,7 @@ void PerformClustering(cv::Mat& in_luvWholeImage, const cv::Rect& in_ROI, int in
 /****       Utility Functions' Implementation *****/
 /**************************************************/
 
-void DrawContoursOfClusters(cv::Mat & in_targetImage, const std::unordered_map <int, Cluster>& in_clusters, cv::Scalar in_color)
+void DrawContoursOfClusters(cv::Mat & in_targetImage, const std::unordered_map <int, MeanShiftCluster>& in_clusters, cv::Scalar in_color)
 {
 	for (auto& eachCluster : in_clusters)
 	{
@@ -99,7 +99,7 @@ void DrawContoursOfClusters(cv::Mat & in_targetImage, const std::unordered_map <
 	}
 }
 
-void DrawOuterContourOfCluster(cv::Mat & in_targetImage, const Cluster & in_cluster, cv::Scalar in_color)
+void DrawOuterContourOfCluster(cv::Mat & in_targetImage, const MeanShiftCluster & in_cluster, cv::Scalar in_color)
 {
 	const auto& points = in_cluster.GetPointsArray();
 	const auto nTotalPoints = points.size();
@@ -162,7 +162,7 @@ bool SearchMapForMaxPair(const std::unordered_map<int, int>& in_map, const int k
 	}
 }
 
-void FindAllOuterPointsOfCluster(const cv::Size& in_frameSize, const Cluster & in_cluster, std::vector<cv::Point> &out_points)
+void FindAllOuterPointsOfCluster(const cv::Size& in_frameSize, const MeanShiftCluster & in_cluster, std::vector<cv::Point> &out_points)
 {
 	cv::Mat alphaMap;
 	std::vector<std::vector<cv::Point>> contours;
@@ -175,7 +175,7 @@ void FindAllOuterPointsOfCluster(const cv::Size& in_frameSize, const Cluster & i
 	out_points = contours[0];
 }
 
-void CreateAlphaMapFromCluster(const cv::Size & in_alphaMapSize, const Cluster & in_cluster, cv::Mat & out_alphaMap)
+void CreateAlphaMapFromCluster(const cv::Size & in_alphaMapSize, const MeanShiftCluster & in_cluster, cv::Mat & out_alphaMap)
 {
 	cv::Mat alphaMap(in_alphaMapSize, CV_8UC1, cv::Scalar(0));
 	auto& arrayOfPoints = in_cluster.GetPointsArray();
@@ -188,7 +188,7 @@ void CreateAlphaMapFromCluster(const cv::Size & in_alphaMapSize, const Cluster &
 	out_alphaMap = alphaMap;
 }
 
-void ProjectClusterIntoMat(const Cluster & in_cluster, cv::Mat & out_mat)
+void ProjectClusterIntoMat(const MeanShiftCluster & in_cluster, cv::Mat & out_mat)
 {
 	auto pointsArray = in_cluster.GetPointsArray();
 	auto colorInLuv = in_cluster.GetLuvColor();
@@ -202,7 +202,7 @@ void ProjectClusterIntoMat(const Cluster & in_cluster, cv::Mat & out_mat)
 	}
 }
 
-void FindBiggestCluster(const std::unordered_map<int, Cluster>& in_clusters, int & out_biggestClusterLabel)
+void FindBiggestCluster(const std::unordered_map<int, MeanShiftCluster>& in_clusters, int & out_biggestClusterLabel)
 {
 	// find Max Cluster among negihbor clusters
 	int maxLabel = -10;
@@ -238,10 +238,10 @@ static int FindMaxIndexInArray(std::vector<T> &in_vector, int in_vectorSize)
 	return currentMaxIndex;
 }
 
-void PerformColorMergingFromSeedClusterAndUpdateClusterList(std::unordered_map <int, Cluster> &in_updatedClusterList, const int in_seedIndex)
+void PerformColorMergingFromSeedClusterAndUpdateClusterList(std::unordered_map <int, MeanShiftCluster> &in_updatedClusterList, const int in_seedIndex)
 {
 	// SeedCluster (차체 중 일부)를 중심으로 색상차이가 얼마 안나는 나머지 Cluster들과 merging 작업을 시작한다.
-	Cluster &seedCluster = in_updatedClusterList[in_seedIndex];
+	MeanShiftCluster &seedCluster = in_updatedClusterList[in_seedIndex];
 	cv::Point3i seedClusterHSVColor = seedCluster.GetHSVColor();
 	cv::Point3i seedClusterLuvColor = seedCluster.GetLuvColor();
 
@@ -304,7 +304,7 @@ void PerformColorMergingFromSeedClusterAndUpdateClusterList(std::unordered_map <
 	}
 
 	// Merging후 최종 클러스터들 목록
-	std::unordered_map<int, Cluster> finalClusterList;
+	std::unordered_map<int, MeanShiftCluster> finalClusterList;
 	// 보존되야할 녀석들을 최종 클러스터 목록에 저장한다.
 	for (auto& shouldBePreservedClusterLabel : toBePreservedClusterIndicies)
 	{
@@ -317,9 +317,9 @@ void PerformColorMergingFromSeedClusterAndUpdateClusterList(std::unordered_map <
 	in_updatedClusterList = finalClusterList;
 }
 
-void Find_TopN_BiggestClusters(const std::unordered_map<int, Cluster>& in_clusters, const int in_N, std::vector<int>& out_labels)
+void Find_TopN_BiggestClusters(const std::unordered_map<int, MeanShiftCluster>& in_clusters, const int in_N, std::vector<int>& out_labels)
 {
-	 //규모가 큰 #(kNumberOfCandidateClusters)개의 클러스터 레이블을 취득한다.
+	//규모가 큰 #(kNumberOfCandidateClusters)개의 클러스터 레이블을 취득한다.
 	for (const auto& eachCluster : in_clusters)
 	{
 		int currentLabel = eachCluster.first;
@@ -345,7 +345,7 @@ void Find_TopN_BiggestClusters(const std::unordered_map<int, Cluster>& in_cluste
 }
 
 void GetAdequacyScoresToBeSeed(const cv::Size in_imageSize,
-	const std::unordered_map<int, Cluster> &in_clusters,
+	const std::unordered_map<int, MeanShiftCluster> &in_clusters,
 	const int in_numberOfCandidates,
 	const int in_numberOfRandomSamples,
 	const std::vector<int> in_candidateClusterLabels,
@@ -358,14 +358,14 @@ void GetAdequacyScoresToBeSeed(const cv::Size in_imageSize,
 	std::vector<double> candidateClusterSize(in_numberOfCandidates);
 	std::vector<double> candidateClusterWeights(in_numberOfCandidates);
 	std::vector<double> candidateAdequacyScoresToBeSeed(in_numberOfCandidates);
-	
+
 	// 각 Cluster들이 이미지 중심으로부터 얼마나 먼지 계산하여, 멀면 멀수록 작은 Guassian Weight를 부여해서
 	// 클러스터의 중요도를 떨어뜨린다 (SeedCluster일 가능성을 낮춘다)
 	auto largerLength = (in_imageSize.width > in_imageSize.height) ? in_imageSize.width : in_imageSize.height;
 	const double expCoefficient = -12.5 / pow(largerLength, 2);
 	for (int i = 0; i < in_numberOfCandidates; ++i)
 	{
-		const Cluster& currentCandidateCluster = in_clusters.at(in_candidateClusterLabels[i]);
+		const MeanShiftCluster& currentCandidateCluster = in_clusters.at(in_candidateClusterLabels[i]);
 		const int currentCandidateClusterSize = currentCandidateCluster.GetTotalPoints();
 		const auto& currentCandidateClusterPoints = currentCandidateCluster.GetPointsArray();
 
@@ -400,7 +400,7 @@ void VisualizeLabelMap(const cv::Mat& in_labelMap, cv::Mat& out_colorLabelMap)
 /*****************************************************/
 
 #pragma optimize("gpsy", off)
-void CaclculateEdgeMap(const cv::Mat &in_imageMat, cv::Mat& out_edgeMap)
+void CaclculateGradientMap(const cv::Mat &in_imageMat, cv::Mat& out_edgeMap)
 {
 	// out_edgeMap은 gradient magnitude map과 같다.
 	cv::Mat copiedBlurImage;
@@ -417,9 +417,7 @@ void CaclculateEdgeMap(const cv::Mat &in_imageMat, cv::Mat& out_edgeMap)
 	cv::convertScaleAbs(grad_x, abs_grad_x);
 	cv::convertScaleAbs(grad_y, abs_grad_y);
 
-	cv::addWeighted(abs_grad_x, 0.2, abs_grad_y, 0.8, 0, out_edgeMap);
-
-	cv::imshow("Gradient Image", out_edgeMap);
+	cv::addWeighted(abs_grad_x, 0, abs_grad_y, 1, 0, out_edgeMap);
 	//cv::inRange(grad, 100, 220, grad);
 }
 #pragma optimize("gpsy", on)
@@ -479,7 +477,7 @@ void GetPointsInContour(const cv::Size& in_imageSize, const std::vector<cv::Poin
 }
 #pragma optimize("gpsy", on)
 
-void UpdateLabelMap(const std::unordered_map<int, Cluster>& in_clusters, cv::Mat & inout_labelMap )
+void UpdateLabelMap(const std::unordered_map<int, MeanShiftCluster>& in_clusters, cv::Mat & inout_labelMap)
 {
 	for (auto eachCluster : in_clusters)
 	{
@@ -496,12 +494,7 @@ void UpdateLabelMap(const std::unordered_map<int, Cluster>& in_clusters, cv::Mat
 #pragma optimize("gpsy", off)
 bool ExtractCarBody(const cv::Mat & in_srcImage, const AlgorithmParameter& in_parameter, AlgorithmResult& out_result)
 {
-	cv::Mat originalImage;														// 원본이미지
-	cv::Mat originalHSVImage;													
-	cv::Mat filteredImageMat_luv;												// 원본이미지의 민 쉬프트 필터링된 버젼
-	cv::Mat luvOriginalImageMat;												// 원본이미지의 LUV format
-	cv::Mat labelMap;															// 레이블맵
-	cv::Mat edgeMagnitudeMap;													// 에지 Magnitude Mat
+	cv::Mat originalImage, originalHSVImage, filteredImageMat_luv, luvOriginalImageMat, labelMap, edgeGradientMap;
 
 	in_srcImage.copyTo(originalImage);											// 입력받은 이미지를 deep copy해옴.
 	cv::cvtColor(originalImage, luvOriginalImageMat, CV_BGR2Luv);				// 원본이미지 Color Space 변환 (BGR -> Luv)
@@ -510,10 +503,10 @@ bool ExtractCarBody(const cv::Mat & in_srcImage, const AlgorithmParameter& in_pa
 	cv::Point2d imageCenter(originalImage.cols / 2, originalImage.rows / 2);	// 이미지 중심
 	int kTotalPixels = originalImage.total();									// 총 픽셀수 저장
 
-	double sp = in_parameter.GetSpatialBandwidth();								// Mean Shift Filtering을 위한 spatial radius
-	double sr = in_parameter.GetColorBandwidth();								// Mean Shift Filtering을 위한 range (color) radius
+	double sp = in_parameter.m_spatialBandwidth;								// Mean Shift Filtering을 위한 spatial radius
+	double sr = in_parameter.m_colorBandwidth;									// Mean Shift Filtering을 위한 range (color) radius
 
-	std::unordered_map<int, Cluster> clusterList; 									// Cluster 모음, Key = Label, Value = Cluster
+	std::unordered_map<int, MeanShiftCluster> clusterList; 									// Cluster 모음, Key = Label, Value = Cluster
 
 	int seedClusterIndex = -2;
 	int minThresholdToBeCluster = (int)(originalImage.rows * originalImage.cols * 0.01);
@@ -524,30 +517,67 @@ bool ExtractCarBody(const cv::Mat & in_srcImage, const AlgorithmParameter& in_pa
 	PerformClustering(filteredImageMat_luv, cv::Rect(0, 0, originalImage.cols, originalImage.rows), minThresholdToBeCluster, labelMap, clusterList);
 	const int kNumberOfCandidateClusters = (clusterList.size() >= 4) ? clusterList.size() : 4;
 	std::vector<int> candidateClusterLabels(kNumberOfCandidateClusters);
-	
+
 	// 규모가 큰 #(kNumberOfCandidateClusters)개의 클러스터 레이블을 취득한다.
 	Find_TopN_BiggestClusters(clusterList, kNumberOfCandidateClusters, candidateClusterLabels);
 
 	// 각 Candidate Cluster들을 대상으로 누가 Seed로써 적합한지 계산!
 	GetAdequacyScoresToBeSeed(cv::Size(originalImage.cols, originalImage.rows), clusterList, kNumberOfCandidateClusters, kNumberOfRandomSamples, candidateClusterLabels, seedClusterIndex);
-	
+
 	// SeedCluster를 기반으로 Color Merging을 수행한다.
 	PerformColorMergingFromSeedClusterAndUpdateClusterList(clusterList, seedClusterIndex);
 
 	// 업데이트된 클러스터를 기반으로 Label Map을 업데이트 한다.
 	UpdateLabelMap(clusterList, labelMap);
 
-	// Edge Map을 계산한다
-	CaclculateEdgeMap(originalImage, edgeMagnitudeMap);
-
-	// Merging 작업 후의 SeedCluster의 외곽선을 그려서 출력한다
-	DrawOuterContourOfCluster(originalImage, clusterList[seedClusterIndex], cv::Scalar(255, 255, 0));
-	cv::imshow("Contour Image", originalImage);
+	if (in_parameter.m_bGetGradientMap) 
+	{
+		CaclculateGradientMap(originalImage, edgeGradientMap);
+		cv::imshow("GradientMap", edgeGradientMap);
+	}
 
 	// 레이블맵을 컬러매핑해서 Visualize한다
-	cv::Mat colorLabelMap;
-	VisualizeLabelMap(labelMap, colorLabelMap);
+	if (in_parameter.m_bGetColorLabelMap)
+	{
+		cv::Mat colorLabelMap;
+		VisualizeLabelMap(labelMap, colorLabelMap);
+	}
 
+	if (in_parameter.m_bGetCornerMap)
+	{
+		cv::Mat originalGrayImage;
+		cv::Mat dst;
+		cv::cvtColor(originalImage, originalGrayImage, CV_BGR2GRAY);
+		cv::Mat copiedOriginalImage;
+
+		originalImage.copyTo(copiedOriginalImage);
+
+		std::vector<cv::Point2f> corners;
+		double qualityLevel = 0.01;
+		double minDistance = 3;
+		int blockSize = 3;
+		bool useHarris = false;
+		double k = 0.04;
+
+		cv::goodFeaturesToTrack(originalGrayImage, corners, 100, qualityLevel, minDistance, cv::Mat(), blockSize, useHarris, k);
+
+		int r = 4;
+
+		for (int i = 0; i < corners.size(); ++i)
+		{
+			cv::circle(copiedOriginalImage, corners[i], r, cv::Scalar(255, 255, 0), 2);
+		}
+		
+		cv::imshow("Corner Map", copiedOriginalImage);
+		//cv::imshow("??", originalImage);
+	}
+
+	if (in_parameter.m_bGetContouredMap)
+	{
+		// Merging 작업 후의 SeedCluster의 외곽선을 그려서 출력한다
+		DrawOuterContourOfCluster(originalImage, clusterList[seedClusterIndex], cv::Scalar(255, 255, 0));
+		cv::imshow("Contour Image", originalImage);
+	}
 	std::vector<cv::Point> aa;
 	FindPossibleDefectAreasUsingBlobDetection(originalImage, aa);
 	return true;
