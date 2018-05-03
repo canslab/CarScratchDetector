@@ -187,10 +187,10 @@ void CCarScratchDetectorDlg::OnBnClickedRunbutton()
 	param.m_spatialBandwidth = atof(spatialRadiusString);
 	param.m_colorBandwidth = atof(colorRadiusString);
 	
-	param.m_bGetGradientMap = (bool)IsDlgButtonChecked(IDC_GRADIENTMAPCHECK);
-	param.m_bGetColorLabelMap = (bool)IsDlgButtonChecked(IDC_LABELMAPCHECK);
-	param.m_bGetCornerMap = (bool)IsDlgButtonChecked(IDC_CORNERMAPCHECK);
-	param.m_bGetContouredMap = (bool)IsDlgButtonChecked(IDC_CONTOURMAPCHECK);
+	param.m_bGetGradientMap = IsDlgButtonChecked(IDC_GRADIENTMAPCHECK);
+	param.m_bGetColorLabelMap = IsDlgButtonChecked(IDC_LABELMAPCHECK);
+	param.m_bGetCornerMap = IsDlgButtonChecked(IDC_CORNERMAPCHECK);
+	param.m_bGetContouredMap = IsDlgButtonChecked(IDC_CONTOURMAPCHECK);
 
 	if (m_srcMat.data != nullptr)
 	{

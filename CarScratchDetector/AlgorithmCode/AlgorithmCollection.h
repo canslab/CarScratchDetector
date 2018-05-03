@@ -217,3 +217,6 @@ void GetAdequacyScoresToBeSeed(const cv::Size in_imageSize,
 	int& out_seedLabel);
 
 void VisualizeLabelMap(const cv::Mat& in_labelMap, cv::Mat& out_colorLabelMap);
+
+// DBSCAN Method
+//void PeformDBSCAN(std::vector<cv::Point> &in_points, std::vector<)

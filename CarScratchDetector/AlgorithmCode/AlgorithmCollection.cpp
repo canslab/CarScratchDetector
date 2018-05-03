@@ -2,6 +2,7 @@
 #include "MeanShiftCluster.h"
 #include "..\UtilityCode\Timer.h"
 #include "..\CarNumberRemoveCode\LPdetection.h" 
+#include "..\DBSCAN.h"
 
 #define NOT_CLUSTER_LABEL -1
 
@@ -530,7 +531,7 @@ bool ExtractCarBody(const cv::Mat & in_srcImage, const AlgorithmParameter& in_pa
 	// 업데이트된 클러스터를 기반으로 Label Map을 업데이트 한다.
 	UpdateLabelMap(clusterList, labelMap);
 
-	if (in_parameter.m_bGetGradientMap) 
+	if (in_parameter.m_bGetGradientMap)
 	{
 		CaclculateGradientMap(originalImage, edgeGradientMap);
 		cv::imshow("GradientMap", edgeGradientMap);
@@ -559,17 +560,71 @@ bool ExtractCarBody(const cv::Mat & in_srcImage, const AlgorithmParameter& in_pa
 		bool useHarris = false;
 		double k = 0.04;
 
-		cv::goodFeaturesToTrack(originalGrayImage, corners, 100, qualityLevel, minDistance, cv::Mat(), blockSize, useHarris, k);
+		cv::goodFeaturesToTrack(originalGrayImage, corners, 150, qualityLevel, minDistance, cv::Mat(), blockSize, useHarris, k);
 
 		int r = 4;
+		std::list<Point_DBSCAN*> pointsForDBSCAN;
 
-		for (int i = 0; i < corners.size(); ++i)
+		GeneratePointsForDBSCAN(corners, pointsForDBSCAN);
+
+		std::vector<Cluster_DBSCAN> cornerClusterList;
+		PerformDBSCAN(pointsForDBSCAN, 15, 1, cornerClusterList);
+		//cv::Mat ahah;
+		//cv::cvtColor(filteredImageMat_luv, ahah, CV_Luv2BGR);
+		//cv::cvtColor(ahah, ahah, CV_BGR2HSV);
+
+		std::vector<cv::Rect> rects;
+
+		// Visualize Clustering Result
+		for (auto& eachCluster : cornerClusterList)
 		{
-			cv::circle(copiedOriginalImage, corners[i], r, cv::Scalar(255, 255, 0), 2);
+			std::vector<cv::Point> aaaa;
+			const auto& pointsList = eachCluster.GetPointsList();
+			cv::Scalar color(rand() % 255, rand() % 255, rand() % 255);
+			for (auto& eachPoint : pointsList)
+			{
+				cv::circle(copiedOriginalImage, eachPoint->m_point, r, color, 2);
+				aaaa.push_back(eachPoint->m_point);
+			}
+
+			rects.push_back(cv::boundingRect(aaaa));
+			auto t = cv::minAreaRect(aaaa);
+			
+			cv::Point2f fourPoints[4];
+			t.points(fourPoints);
+	/*		
+			std::vector<std::vector<cv::Point>> hull(1);
+			cv::convexHull(aaaa, hull);
+			cv::drawContours(copiedOriginalImage, hull, -1, cv::Scalar(255, 255, 0));*/
+
+			for (int i = 0; i < 4; ++i)
+			{
+				cv::line(copiedOriginalImage, fourPoints[0], fourPoints[1], cv::Scalar(255, 255, 0), 2);
+				cv::line(copiedOriginalImage, fourPoints[1], fourPoints[2], cv::Scalar(255, 255, 0), 2);
+				cv::line(copiedOriginalImage, fourPoints[2], fourPoints[3], cv::Scalar(255, 255, 0), 2);
+				cv::line(copiedOriginalImage, fourPoints[3], fourPoints[0], cv::Scalar(255, 255, 0), 2);
+			}
 		}
-		
+		for (auto eachRect : rects)
+		{
+			//cv::rectangle(copiedOriginalImage, eachRect, cv::Scalar(255, 255, 0), 2);
+		}
+	
+		//cv::Mat arr, brr, crr;
+
+		//copiedOriginalImage(cv::Rect(0, 0, 64, 64)).copyTo(arr);
+		//cv::cvtColor(arr, arr, CV_BGR2GRAY);
+		//arr.convertTo(arr, CV_32F);
+		//cv::dct(arr, brr);		
+
+		//copiedOriginalImage(cv::Rect(240, 39, 64, 64)).copyTo(arr);
+		//cv::cvtColor(arr, arr, CV_BGR2GRAY);
+		//arr.convertTo(arr, CV_32F);
+		//cv::dct(arr, crr);
+
+		// 
 		cv::imshow("Corner Map", copiedOriginalImage);
-		//cv::imshow("??", originalImage);
+		int a = 30;
 	}
 
 	if (in_parameter.m_bGetContouredMap)
@@ -578,8 +633,7 @@ bool ExtractCarBody(const cv::Mat & in_srcImage, const AlgorithmParameter& in_pa
 		DrawOuterContourOfCluster(originalImage, clusterList[seedClusterIndex], cv::Scalar(255, 255, 0));
 		cv::imshow("Contour Image", originalImage);
 	}
-	std::vector<cv::Point> aa;
-	FindPossibleDefectAreasUsingBlobDetection(originalImage, aa);
+
 	return true;
 }
 #pragma optimize("gpsy", on)

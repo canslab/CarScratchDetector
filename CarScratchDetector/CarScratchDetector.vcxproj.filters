@@ -57,6 +57,12 @@
     <ClInclude Include="AlgorithmCode\MeanShiftCluster.h">
       <Filter>AlgorithmCode\Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="DBSCAN.h">
+      <Filter>AlgorithmCode\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ClusterForDBSCAN.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="CarScratchDetector.cpp">
@@ -81,6 +87,12 @@
       <Filter>AlgorithmCode\NumberRemoveCode</Filter>
     </ClCompile>
     <ClCompile Include="AlgorithmCode\MeanShiftCluster.cpp">
+      <Filter>AlgorithmCode</Filter>
+    </ClCompile>
+    <ClCompile Include="DBSCAN.cpp">
+      <Filter>AlgorithmCode</Filter>
+    </ClCompile>
+    <ClCompile Include="ClusterForDBSCAN.cpp">
       <Filter>AlgorithmCode</Filter>
     </ClCompile>
   </ItemGroup>
