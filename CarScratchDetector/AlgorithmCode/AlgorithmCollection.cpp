@@ -410,7 +410,6 @@ void CaclculateGradientMap(const cv::Mat &in_imageMat, cv::Mat& out_edgeMap)
 
 	cv::Mat grad_x, grad_y;
 	cv::Mat abs_grad_x, abs_grad_y;
-	//cv::Mat grad;
 
 	cv::Sobel(copiedBlurImage, grad_x, CV_16S, 1, 0, 3);
 	cv::Sobel(copiedBlurImage, grad_y, CV_16S, 0, 1, 3);
@@ -419,7 +418,6 @@ void CaclculateGradientMap(const cv::Mat &in_imageMat, cv::Mat& out_edgeMap)
 	cv::convertScaleAbs(grad_y, abs_grad_y);
 
 	cv::addWeighted(abs_grad_x, 0, abs_grad_y, 1, 0, out_edgeMap);
-	//cv::inRange(grad, 100, 220, grad);
 }
 #pragma optimize("gpsy", on)
 
@@ -495,9 +493,11 @@ void UpdateLabelMap(const std::unordered_map<int, MeanShiftCluster>& in_clusters
 #pragma optimize("gpsy", off)
 bool ExtractCarBody(const cv::Mat & in_srcImage, const AlgorithmParameter& in_parameter, AlgorithmResult& out_result)
 {
-	cv::Mat originalImage, originalHSVImage, filteredImageMat_luv, luvOriginalImageMat, labelMap, edgeGradientMap;
+	cv::Mat originalImage, copiedGrayImage, originalHSVImage, filteredImageMat_luv, luvOriginalImageMat, labelMap, edgeGradientMap;
 
 	in_srcImage.copyTo(originalImage);											// 입력받은 이미지를 deep copy해옴.
+	
+	cv::cvtColor(originalImage, copiedGrayImage, CV_BGR2GRAY);					// 입력받은 이미지 그레이스케일 화
 	cv::cvtColor(originalImage, luvOriginalImageMat, CV_BGR2Luv);				// 원본이미지 Color Space 변환 (BGR -> Luv)
 	cv::cvtColor(originalImage, originalHSVImage, CV_BGR2HSV);
 
@@ -512,6 +512,7 @@ bool ExtractCarBody(const cv::Mat & in_srcImage, const AlgorithmParameter& in_pa
 	int seedClusterIndex = -2;
 	int minThresholdToBeCluster = (int)(originalImage.rows * originalImage.cols * 0.01);
 	const int kNumberOfRandomSamples = (minThresholdToBeCluster < 200) ? minThresholdToBeCluster : 200;
+
 
 	// Mean Shift Filtering + Clustering 작업 수행
 	cv::pyrMeanShiftFiltering(luvOriginalImageMat, filteredImageMat_luv, sp, sr);
@@ -528,13 +529,23 @@ bool ExtractCarBody(const cv::Mat & in_srcImage, const AlgorithmParameter& in_pa
 	// SeedCluster를 기반으로 Color Merging을 수행한다.
 	PerformColorMergingFromSeedClusterAndUpdateClusterList(clusterList, seedClusterIndex);
 
-	// 업데이트된 클러스터를 기반으로 Label Map을 업데이트 한다.
+	// 업데이트된 클러스터를 기반으로 Label Map을 업데이트 한다.^
 	UpdateLabelMap(clusterList, labelMap);
+	
+	cv::Mat grayScaleOriginalImage;
+	cv::Mat edges;
+	cv::cvtColor(originalImage, grayScaleOriginalImage, CV_BGR2GRAY);
+	cv::Canny(grayScaleOriginalImage, edges, 200, 500);
+	cv::imshow("Canny Edge", edges);
 
 	if (in_parameter.m_bGetGradientMap)
 	{
 		CaclculateGradientMap(originalImage, edgeGradientMap);
 		cv::imshow("GradientMap", edgeGradientMap);
+
+		//std::vector<cv::Point2f> coooo;
+		// 그레디언트맵에서 제거 
+		//cv::goodFeaturesToTrack()
 	}
 
 	// 레이블맵을 컬러매핑해서 Visualize한다
@@ -544,36 +555,52 @@ bool ExtractCarBody(const cv::Mat & in_srcImage, const AlgorithmParameter& in_pa
 		VisualizeLabelMap(labelMap, colorLabelMap);
 	}
 
+	// 코너 맵을 표시한다면
 	if (in_parameter.m_bGetCornerMap)
 	{
-		cv::Mat originalGrayImage;
-		cv::Mat dst;
-		cv::cvtColor(originalImage, originalGrayImage, CV_BGR2GRAY);
 		cv::Mat copiedOriginalImage;
-
+		cv::Mat dst;
 		originalImage.copyTo(copiedOriginalImage);
-
+		
 		std::vector<cv::Point2f> corners;
+		std::vector<cv::Point2f> refinedCorners;
 		double qualityLevel = 0.01;
 		double minDistance = 3;
 		int blockSize = 3;
 		bool useHarris = false;
 		double k = 0.04;
 
-		cv::goodFeaturesToTrack(originalGrayImage, corners, 150, qualityLevel, minDistance, cv::Mat(), blockSize, useHarris, k);
+		//cv::goodFeaturesToTrack(copiedGrayImage, corners, 150, qualityLevel, minDistance, cv::Mat(), blockSize, useHarris, k);
+		cv::goodFeaturesToTrack(edgeGradientMap, corners, 150, qualityLevel, minDistance, cv::Mat(), blockSize, useHarris, k);
 
+		for (auto& eachCorner : corners)
+		{
+			auto labelOfEachCorner = labelMap.at<int>(eachCorner.y, eachCorner.x);
+
+			if (labelOfEachCorner == -1 || labelOfEachCorner == seedClusterIndex)
+			{
+				refinedCorners.push_back(eachCorner);
+			}
+		}
+		
 		int r = 4;
 		std::list<Point_DBSCAN*> pointsForDBSCAN;
 
-		GeneratePointsForDBSCAN(corners, pointsForDBSCAN);
+		GeneratePointsForDBSCAN(refinedCorners, pointsForDBSCAN);
 
-		std::vector<Cluster_DBSCAN> cornerClusterList;
-		PerformDBSCAN(pointsForDBSCAN, 15, 1, cornerClusterList);
-		//cv::Mat ahah;
-		//cv::cvtColor(filteredImageMat_luv, ahah, CV_Luv2BGR);
-		//cv::cvtColor(ahah, ahah, CV_BGR2HSV);
+		std::vector<Cluster_DBSCAN> tempCornerClusterList;
+		std::list<Cluster_DBSCAN> cornerClusterList;
+		PerformDBSCAN(pointsForDBSCAN, 15, 1, tempCornerClusterList);
 
 		std::vector<cv::Rect> rects;
+
+		for (int idx = 0; idx < tempCornerClusterList.size(); ++idx)
+		{
+			if (tempCornerClusterList[idx].GetPointsList().size() > 1)
+			{
+				cornerClusterList.push_back(tempCornerClusterList[idx]);
+			}
+		}
 
 		// Visualize Clustering Result
 		for (auto& eachCluster : cornerClusterList)
@@ -581,6 +608,7 @@ bool ExtractCarBody(const cv::Mat & in_srcImage, const AlgorithmParameter& in_pa
 			std::vector<cv::Point> aaaa;
 			const auto& pointsList = eachCluster.GetPointsList();
 			cv::Scalar color(rand() % 255, rand() % 255, rand() % 255);
+			//cv::Scalar color(255, 255, 0);
 			for (auto& eachPoint : pointsList)
 			{
 				cv::circle(copiedOriginalImage, eachPoint->m_point, r, color, 2);
@@ -592,10 +620,6 @@ bool ExtractCarBody(const cv::Mat & in_srcImage, const AlgorithmParameter& in_pa
 			
 			cv::Point2f fourPoints[4];
 			t.points(fourPoints);
-	/*		
-			std::vector<std::vector<cv::Point>> hull(1);
-			cv::convexHull(aaaa, hull);
-			cv::drawContours(copiedOriginalImage, hull, -1, cv::Scalar(255, 255, 0));*/
 
 			for (int i = 0; i < 4; ++i)
 			{
@@ -609,20 +633,7 @@ bool ExtractCarBody(const cv::Mat & in_srcImage, const AlgorithmParameter& in_pa
 		{
 			//cv::rectangle(copiedOriginalImage, eachRect, cv::Scalar(255, 255, 0), 2);
 		}
-	
-		//cv::Mat arr, brr, crr;
 
-		//copiedOriginalImage(cv::Rect(0, 0, 64, 64)).copyTo(arr);
-		//cv::cvtColor(arr, arr, CV_BGR2GRAY);
-		//arr.convertTo(arr, CV_32F);
-		//cv::dct(arr, brr);		
-
-		//copiedOriginalImage(cv::Rect(240, 39, 64, 64)).copyTo(arr);
-		//cv::cvtColor(arr, arr, CV_BGR2GRAY);
-		//arr.convertTo(arr, CV_32F);
-		//cv::dct(arr, crr);
-
-		// 
 		cv::imshow("Corner Map", copiedOriginalImage);
 		int a = 30;
 	}
