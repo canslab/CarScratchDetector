@@ -176,7 +176,7 @@ bool ExtractCarBody(const cv::Mat& in_srcImage, const AlgorithmParameter& in_par
 void PerformClustering(cv::Mat& in_luvWholeImage, const cv::Rect& in_ROI, int in_thresholdToBeCluster, cv::Mat& out_labelMap, std::unordered_map<int, MeanShiftCluster>& out_clusters);
 
 // 입력받은 이미지에서 EdgeMap을 만들어준다.
-void CaclculateGradientMap(const cv::Mat &in_imageMat, cv::Mat& out_edgeMap);
+void CaclculateGradientMap(const cv::Mat &in_imageMat, cv::Mat& out_edgeMap, double in_gradX_alpha, double in_gradY_beta);
 
 // Blob Detection을 통해 결함이 있을만한 영역을 찾는다.
 void FindPossibleDefectAreasUsingBlobDetection(const cv::Mat &in_imageMat, const std::vector<cv::Point> &out_centerPointsOfPossibleAreas);
@@ -217,6 +217,7 @@ void GetAdequacyScoresToBeSeed(const cv::Size in_imageSize,
 	int& out_seedLabel);
 
 void VisualizeLabelMap(const cv::Mat& in_labelMap, cv::Mat& out_colorLabelMap);
-
-// DBSCAN Method
-//void PeformDBSCAN(std::vector<cv::Point> &in_points, std::vector<)
+bool IsThisPointCloseToContour(const std::vector<std::vector<cv::Point>> &in_contours, const cv::Point in_thisPoint, double in_distance);
+bool IsThisPointInsideOneOfContours(const std::vector<std::vector<cv::Point>> &in_contours, const cv::Point& in_thisPoint);
+cv::Scalar GetAverageColorOfPointsArray(cv::Mat in_srcImage, const std::vector<cv::Point> &in_points);
+bool IsThisContourInROI(const std::vector<cv::Point>& in_points, const cv::Size in_imageSize, const cv::Rect in_ROI);

@@ -141,7 +141,7 @@ void CCarScratchDetectorDlg::OnBnClickedOpenimagefilebtn()
 			accValue += 10;
 			totalPixel = (int)(accValue * accValue * aspectRatio);
 
-		} while (totalPixel <= 90000);
+		} while (totalPixel <= 100000);
 
 		resizedWidth = accValue;
 		resizedHeight = aspectRatio * accValue;

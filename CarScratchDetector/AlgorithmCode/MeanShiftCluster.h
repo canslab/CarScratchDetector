@@ -15,6 +15,10 @@ private:
 	// 클러스터내부의 레이블 값
 	int m_label;
 
+	// 
+	bool m_bAlreadyAllocated = false;
+	int m_currentIndex = 0;
+
 public:
 	cv::Point2d GetCenterPoint() const
 	{
@@ -65,6 +69,11 @@ public:
 		return m_boundedBox;
 	}
 
+	bool DoesContainCertainPoint(cv::Point in_certainPoint) const
+	{
+		return (std::find(m_pointsArray.begin(), m_pointsArray.begin() + m_currentIndex, in_certainPoint) != m_pointsArray.end());
+	}
+
 public:
 	void SetColorUsingLuvVector(const cv::Vec3b& in_luvColorVector)
 	{
@@ -98,19 +107,27 @@ public:
 		// 바운딩 박스 업데이트
 		m_boundedBox = cv::boundingRect(m_pointsArray);
 	}
-	bool AddPoint(const cv::Point &in_point)
+	void AddPoint(const cv::Point &in_point)
 	{
 		// 없으면.. 등록해..
-		if (std::find(m_pointsArray.begin(), m_pointsArray.end(), in_point) == m_pointsArray.end())
+		//if (std::find(m_pointsArray.begin(), m_pointsArray.end(), in_point) == m_pointsArray.end())
+		//{
+		if (m_bAlreadyAllocated == true)
 		{
-			m_pointsArray.push_back(in_point);
-			m_boundedBox = cv::boundingRect(m_pointsArray);
-			return true;
+			m_pointsArray[m_currentIndex] = in_point;
 		}
 		else
 		{
-			return false;
+			m_pointsArray.push_back(in_point);
+			m_boundedBox = cv::boundingRect(m_pointsArray);
 		}
+		m_currentIndex++;
+		//return true;
+	//}
+	//else
+	//{
+		//return false;
+	//}
 	}
 
 public:
@@ -141,6 +158,11 @@ public:
 	MeanShiftCluster() :m_pointsArray(0), m_label(-1)
 	{
 
+	}
+
+	MeanShiftCluster(int in_size) :m_pointsArray(in_size)
+	{
+		m_bAlreadyAllocated = true;
 	}
 
 public:
