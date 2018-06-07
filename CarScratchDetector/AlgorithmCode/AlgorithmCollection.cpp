@@ -588,6 +588,11 @@ void UpdateLabelMap(const std::unordered_map<int, MeanShiftCluster>& in_clusters
 		}
 	}
 }
+bool IsThisPointInROI(const cv::Rect in_roi, const cv::Point in_point)
+{
+	return (in_point.x >= in_roi.x && in_point.x < in_roi.x + in_roi.width) && (in_point.y >= in_roi.y && in_point.y < in_roi.y + in_roi.height);
+}
+
 
 #pragma optimize("gpsy", off)
 bool ExtractCarBody(const cv::Mat & in_srcImage, const AlgorithmParameter& in_parameter, AlgorithmResult& out_result)
@@ -606,9 +611,17 @@ bool ExtractCarBody(const cv::Mat & in_srcImage, const AlgorithmParameter& in_pa
 
 	const int kHueIntervals = 9;												// Hue histogram 만들 때 사용할, Bin의 갯수
 	const int kSatIntervals = 16;												// Saturation histogram 만들 때 사용할, Bin의 갯수
-	const int kROIParameter_Dividier = 4;										// ROI를 만들 때, Width, Height를 각각 몇 등분할지 나타냄. 
-	const int kTotalPixelsInROI = (int)((float)kTotalPixels * ((1 - (2 / (float)kROIParameter_Dividier))* (1 - (2 / (float)kROIParameter_Dividier)))); // ROI내부에 존재하는 총 픽셀수
-	const double kHighThresholdToHighSatImage = 0.65;							// 무채색 이미지이기 위한 Saturation 기준 비율, ROI내부픽셀의 80%(=0.8)가 저채도 => 저채도이미지이다.
+
+	// ROI 설정
+	const int kROIParameter_Dividier = 8;										// ROI를 만들 때, Width, Height를 각각 몇 등분할지 나타냄. 
+	const int kWidthMargin = originalImage.cols / kROIParameter_Dividier;
+	const int kHeightMargin = originalImage.rows / kROIParameter_Dividier;
+	const int kROIWidth = originalImage.cols - (2 * kWidthMargin);
+	const int kROIHeight = originalImage.rows - (2 * kHeightMargin);
+	const cv::Rect kROI(kWidthMargin, kHeightMargin, kROIWidth, kROIHeight);
+
+	const int kTotalPixelsInROI = kROI.area();									// ROI내부에 존재하는 총 픽셀수
+	const double kHighThresholdToHighSatImage = 0.65;							// 무채색 이미지이기 위한 Saturation 기준 비율, ROI내부픽셀의 80%(=0.65)가 저채도 => 저채도이미지이다.
 	const double kLowThresholdToHaveHighSatImage = 0.3;							// 유채색 차량(ex. 하늘색)을 포함하는 이미지는 Saturation 비율이 30%(=0.3) 이하이다.
 
 	std::unordered_map<int, MeanShiftCluster> clusters; 						// Cluster 모음, Key = Label, Value = Cluster
@@ -618,13 +631,13 @@ bool ExtractCarBody(const cv::Mat & in_srcImage, const AlgorithmParameter& in_pa
 
 	cv::Mat highThresholdedGradientMap;
 	cv::Mat testImage;
-	cv::Mat yGradMap;
+	cv::Mat yGradientMap;
 	std::vector<std::vector<cv::Point>> shouldBeExcludedContours;
 	originalImage.copyTo(testImage);
 
 	// 원래 그레디언트 맵, 기스를 얻기 위한 그레디언트 맵 (grad_y only)
 	CaclculateGradientMap(originalImage, edgeGradientMap, 0.5, 0.5);
-	CaclculateGradientMap(originalImage, yGradMap, 0, 1);
+	CaclculateGradientMap(originalImage, yGradientMap, 0, 1);
 	cv::medianBlur(edgeGradientMap, edgeGradientMap, 5);
 
 	cv::imshow("그레디언트 맵", edgeGradientMap);
@@ -632,7 +645,7 @@ bool ExtractCarBody(const cv::Mat & in_srcImage, const AlgorithmParameter& in_pa
 	// 구분선등 기스영역에서 제외해야하는 Connected Component 들을 저장.
 	{
 		cv::threshold(edgeGradientMap, highThresholdedGradientMap, 60, 255, THRESH_BINARY);
-		cv::imshow("High Thresholded 그레디언트 맵 (90-255 사이)", yGradMap);
+		cv::imshow("High Thresholded 그레디언트 맵 (90-255 사이)", yGradientMap);
 		std::vector<std::vector<cv::Point>> strongEdgeContours;
 		cv::findContours(highThresholdedGradientMap, strongEdgeContours, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_NONE);
 
@@ -641,12 +654,12 @@ bool ExtractCarBody(const cv::Mat & in_srcImage, const AlgorithmParameter& in_pa
 			double gradientContourLength = cv::arcLength(strongEdgeContours[j], true);
 
 			// 구분선이라고 확신을 할 수 없지만, 외각 30 픽셀 밖의 영역에 걸쳐져있다면 ==> 제외한다 (어차피 여기서는 기스가 생길 수 없다는 가정)
-			int marginWidth = (int)((double)originalImage.cols / 8);
-			int marginHeight = (int)((double)originalImage.rows / 8);
-			cv::Rect roi(0 + marginWidth, 0 + marginHeight, originalImage.cols - (2 * marginWidth), originalImage.rows - (2 * marginHeight));
+	/*		int marginWidth = (int)((double)originalImage.cols / 8);
+			int marginHeight = (int)((double)originalImage.rows / 8);*/
+			//cv::Rect roi(0 + marginWidth, 0 + marginHeight, originalImage.cols - (2 * marginWidth), originalImage.rows - (2 * marginHeight));
 
 			// 그레디언트 맵에서 충분히 길이가 긴 녀석은 차 구분선일 가능성이 크므로 제외해야 하는 윤곽선 목록(excludedContourLength)에 등록
-			if (gradientContourLength >= 400 || (gradientContourLength >= 10 && !IsThisContourInROI(strongEdgeContours[j], cv::Size(originalImage.cols, originalImage.rows), roi)))
+			if (gradientContourLength >= 500 || (gradientContourLength >= 10 && !IsThisContourInROI(strongEdgeContours[j], cv::Size(originalImage.cols, originalImage.rows), kROI)))
 			{
 				shouldBeExcludedContours.push_back(strongEdgeContours[j]);
 				cv::drawContours(testImage, strongEdgeContours, j, cv::Scalar(rand() % 256, rand() % 256, rand() % 256), 2);
@@ -683,7 +696,7 @@ bool ExtractCarBody(const cv::Mat & in_srcImage, const AlgorithmParameter& in_pa
 
 	// 0.65를 넘어서면 이건 흰색 차량이야.
 	// 이미지에서 대부분의 픽셀이 무채색임. (0.65란 전체이미지 픽셀 중 65%가 0에 가까운 채도이다.)
-	float lowSaturationPixelRatio = (float)(satArray[0] + satArray[1]) / kTotalPixelsInROI;
+	float lowSaturationPixelRatio = (float)(satArray[0] + satArray[1] + satArray[2]) / kTotalPixelsInROI;
 	cv::Mat lastBinaryImage(originalImage.rows, originalImage.cols, CV_8UC1, cv::Scalar::all(0));
 	bool bImageHasLowSaturationCarColor = (lowSaturationPixelRatio > kHighThresholdToHighSatImage);
 	bool bImageHasCertainColor = (lowSaturationPixelRatio < 0.3);
@@ -694,7 +707,7 @@ bool ExtractCarBody(const cv::Mat & in_srcImage, const AlgorithmParameter& in_pa
 
 		cv::inRange(hsvPlanes[1], 0, 40, saturationBinaryImage);
 		// 명도가 90에서 255사이인 영역을 뽑아내자.
-		cv::threshold(hsvPlanes[2], valueBinaryImage, 135, 255, CV_THRESH_BINARY);
+		cv::threshold(hsvPlanes[2], valueBinaryImage, 90, 255, CV_THRESH_BINARY);
 		// 이미지에서 채도가 낮으면서 명도는 일정 값 이상하는 영역을 가려낸다.
 		// 흰색차량(무채색)의 프레임은 보통 명도가 일정 값 이상이면서 채도가 낮다.
 		lastBinaryImage = saturationBinaryImage & valueBinaryImage;
@@ -711,7 +724,7 @@ bool ExtractCarBody(const cv::Mat & in_srcImage, const AlgorithmParameter& in_pa
 		// 이미지에서 가장 주된 Hue값은 무엇인지 구하자.
 		auto maxHueIndex = FindMaxIndexInArray<int>(hueArray, hueArray.size());
 		// 그 주된 Hue값이 60%이상을 차지하는 Major한 Hue값인지 판단
-		bool bIsThisHueMajority = (float)(hueArray[maxHueIndex] / (kTotalPixels / 4)) > kThresholdPercentageToBeMajorHue;
+		bool bIsThisHueMajority = (float)(hueArray[maxHueIndex] / (kROI.area())) > kThresholdPercentageToBeMajorHue;
 
 		if (true)
 		{
@@ -746,12 +759,15 @@ bool ExtractCarBody(const cv::Mat & in_srcImage, const AlgorithmParameter& in_pa
 				currentMaxIndex = i;
 			}
 		}
-		// 차 윤곽선 그림
-		//cv::drawContours(originalImage, carBodyContours, currentMaxIndex, cv::Scalar(255, 255, 0), 4);
-
 		std::vector<cv::Point2f> corners;
-		std::vector<cv::Point2f> meaningfulCorners;
-		cv::goodFeaturesToTrack(copiedGrayImage, corners, 1000, 0.01, 1, cv::Mat(), 3, false, 0.04);
+
+		cv::goodFeaturesToTrack(copiedGrayImage(kROI), corners, 1200, 0.01, 1, cv::Mat(), 3, false, 0.04);
+		for (auto& point : corners)
+		{
+			point.x += kROI.x;
+			point.y += kROI.y;
+		}
+
 
 		// 검출한 코너들을 순회하며, Scratch 가능성이 있는 코너들을 점으로 표시함.
 		for (auto& point : corners)
@@ -777,27 +793,18 @@ bool ExtractCarBody(const cv::Mat & in_srcImage, const AlgorithmParameter& in_pa
 
 			// 코너점 중에서 Gradient 가 어느정도 크기가 되어서 의미있어야 하며
 			// 코너점은 메인차체 내부에 있거나 근처에 있어야함.
-			if (yGradMap.at<uchar>(point) >= 20 && (cv::pointPolygonTest(carBodyContours[currentMaxIndex], point, false) > 0))// || std::abs(cv::pointPolygonTest(carBodyContours[currentMaxIndex], point, true)) <= 10))// && edgeGradientMap.at<uchar>(point) > 30 && IsThisPointNearOneOfContour(shouldBeExcludedContours, point, true) == false)
+			if (yGradientMap.at<uchar>(point) >= 12 && (cv::pointPolygonTest(carBodyContours[currentMaxIndex], point, false) > 0))
 			{
 				// 코너점이 차 구분선 근처에 있지 않는 경우만 의미있음
-				if (IsThisPointCloseToContour(shouldBeExcludedContours, point, 5) == false && IsThisPointInsideOneOfContours(shouldBeExcludedContours, point) == false)
+				if (IsThisPointCloseToContour(shouldBeExcludedContours, point, 5) == false && lastBinaryImage.at<uchar>(point) > 0 && IsThisPointInsideOneOfContours(shouldBeExcludedContours, point) == false)
 				{
 					cv::circle(originalImage, point, 1, cv::Scalar(0, 255, 0), 2);
 				}
-				else
-				{
-					// 차 구분선에 있는경우
-					cv::circle (originalImage, point, 1, cv::Scalar(255, 0, 0), 2);
-				}
-			}
-			// 코너점이 프레임 외부에 있거나 gradient값이 매우 작은 경우.
-			else
-			{
-				cv::circle (originalImage, point, 1, cv::Scalar(0, 0, 255), 2);
 			}
 		}
 	}
 
+	cv::rectangle(originalImage, kROI, cv::Scalar(0, 0, 255), 2);
 	cv::imshow("Result", originalImage);
 	return true;
 }

@@ -221,3 +221,4 @@ bool IsThisPointCloseToContour(const std::vector<std::vector<cv::Point>> &in_con
 bool IsThisPointInsideOneOfContours(const std::vector<std::vector<cv::Point>> &in_contours, const cv::Point& in_thisPoint);
 cv::Scalar GetAverageColorOfPointsArray(cv::Mat in_srcImage, const std::vector<cv::Point> &in_points);
 bool IsThisContourInROI(const std::vector<cv::Point>& in_points, const cv::Size in_imageSize, const cv::Rect in_ROI);
+bool IsThisPointInROI(const cv::Rect in_roi, const cv::Point in_point);
