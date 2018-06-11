@@ -417,6 +417,10 @@ bool IsThisPointCloseToContour(const std::vector<std::vector<cv::Point>> &in_con
 bool IsThisPointInsideOneOfContours(const std::vector<std::vector<cv::Point>>& in_contours, const cv::Point & in_thisPoint)
 {
 	std::vector<int> distanceRecord;
+	if (in_contours.size() == 0)
+	{
+		return false;
+	}
 
 	for (int index = 0; index < in_contours.size(); ++index)
 	{
@@ -501,19 +505,19 @@ void CaclculateGradientMap(const cv::Mat &in_imageMat, cv::Mat& out_edgeMap, dou
 
 	/*for (int rowIndex = 0; rowIndex < in_imageMat.rows; ++rowIndex)
 	{
-		for (int colIndex = 0; colIndex < in_imageMat.cols; ++colIndex)
-		{
-			int tempGradX = (int)abs_grad_x.at<uchar>(rowIndex, colIndex);
-			int tempGradY = (int)abs_grad_y.at<uchar>(rowIndex, colIndex);
-			if (tempGradX < tempGradY)
-			{
-				out_edgeMap.at<uchar>(rowIndex, colIndex) = tempGradY;
-			}
-			else
-			{
-				out_edgeMap.at<uchar>(rowIndex, colIndex) = 0;
-			}
-		}
+	for (int colIndex = 0; colIndex < in_imageMat.cols; ++colIndex)
+	{
+	int tempGradX = (int)abs_grad_x.at<uchar>(rowIndex, colIndex);
+	int tempGradY = (int)abs_grad_y.at<uchar>(rowIndex, colIndex);
+	if (tempGradX < tempGradY)
+	{
+	out_edgeMap.at<uchar>(rowIndex, colIndex) = tempGradY;
+	}
+	else
+	{
+	out_edgeMap.at<uchar>(rowIndex, colIndex) = 0;
+	}
+	}
 	}*/
 
 	cv::addWeighted(abs_grad_x, in_gradX_alpha, abs_grad_y, in_gradY_beta, 0, out_edgeMap);
@@ -556,15 +560,17 @@ void FindPossibleDefectAreasUsingBlobDetection(const cv::Mat & in_imageMat, cons
 #pragma optimize("gpsy", on)
 
 #pragma optimize("gpsy", off)
-void GetPointsInContour(const cv::Size& in_imageSize, const std::vector<cv::Point>& in_contour, std::vector<cv::Point>& out_insidePoints)
+void GetPointsInContour(const std::vector<cv::Point> &in_contour, const double in_distanceFromBoundaryToBeInsidePoint, std::vector<cv::Point> &out_insidePoints)
 {
 	assert(out_insidePoints.size() == 0 && in_imageSize.width > 0 && in_imageSize.height > 0 && in_contour.size() > 0);
+	out_insidePoints.clear();
+	auto boundingRect = cv::boundingRect(in_contour);
 
-	for (auto rowIndex = 0; rowIndex < in_imageSize.height; ++rowIndex)
+	for (auto rowIndex = boundingRect.y; rowIndex < boundingRect.y + boundingRect.height; ++rowIndex)
 	{
-		for (auto colIndex = 0; colIndex < in_imageSize.width; ++colIndex)
+		for (auto colIndex = boundingRect.x; colIndex < boundingRect.x + boundingRect.width; ++colIndex)
 		{
-			bool bInside = (cv::pointPolygonTest(in_contour, cv::Point2f(colIndex, rowIndex), false) > 0);
+			bool bInside = (cv::pointPolygonTest(in_contour, cv::Point2f(colIndex, rowIndex), true) >= in_distanceFromBoundaryToBeInsidePoint);
 
 			if (bInside)
 			{
@@ -572,6 +578,25 @@ void GetPointsInContour(const cv::Size& in_imageSize, const std::vector<cv::Poin
 			}
 		}
 	}
+}
+#pragma optimize("gpsy", on)
+
+#pragma optimize("gpsy", off)
+bool IsContourInsideCarBody(const std::vector<cv::Point>& in_contour, const std::vector<cv::Point>& in_carBodyContourPoints)
+{
+	if (in_carBodyContourPoints.size() == 0)
+	{
+		return true;
+	}
+
+	for (auto& eachPoint : in_contour)
+	{
+		if (cv::pointPolygonTest(in_carBodyContourPoints, eachPoint, false) < 0)
+		{
+			return false;
+		}
+	}
+	return true;
 }
 #pragma optimize("gpsy", on)
 
@@ -593,181 +618,99 @@ bool IsThisPointInROI(const cv::Rect in_roi, const cv::Point in_point)
 	return (in_point.x >= in_roi.x && in_point.x < in_roi.x + in_roi.width) && (in_point.y >= in_roi.y && in_point.y < in_roi.y + in_roi.height);
 }
 
-
 #pragma optimize("gpsy", off)
-bool ExtractCarBody(const cv::Mat & in_srcImage, const AlgorithmParameter& in_parameter, AlgorithmResult& out_result)
+void DetectScratchPointsFromExtractionResult(const cv::Mat in_targetImage, const cv::Rect in_ROI, const cv::Mat in_carBodyBinaryImage, const std::vector<cv::Point> in_carBodyContourPoints,
+	std::vector<cv::Point> &out_scratchPoints)
 {
-	cv::Mat originalImage, copiedGrayImage, originalHSVImage, filteredImageMat_luv, luvOriginalImageMat, filteredImageInBGR, filteredImageInHSV, labelMap, edgeGradientMap;
-
-	in_srcImage.copyTo(originalImage);											// 입력받은 이미지를 deep copy해옴.
-
-	cv::cvtColor(originalImage, copiedGrayImage, CV_BGR2GRAY);					// 입력받은 이미지 그레이스케일 화
-	cv::cvtColor(originalImage, luvOriginalImageMat, CV_BGR2Luv);				// 원본이미지 Color Space 변환 (BGR -> Luv)
-	cv::cvtColor(originalImage, originalHSVImage, CV_BGR2HSV);
-
-	const int kTotalPixels = originalImage.total();								// 총 픽셀수 저장
-	const double sp = in_parameter.m_spatialBandwidth;							// Mean Shift Filtering을 위한 spatial radius
-	const double sr = in_parameter.m_colorBandwidth;							// Mean Shift Filtering을 위한 range (color) radius
-
-	const int kHueIntervals = 9;												// Hue histogram 만들 때 사용할, Bin의 갯수
-	const int kSatIntervals = 16;												// Saturation histogram 만들 때 사용할, Bin의 갯수
-
-	// ROI 설정
-	const int kROIParameter_Dividier = 8;										// ROI를 만들 때, Width, Height를 각각 몇 등분할지 나타냄. 
-	const int kWidthMargin = originalImage.cols / kROIParameter_Dividier;
-	const int kHeightMargin = originalImage.rows / kROIParameter_Dividier;
-	const int kROIWidth = originalImage.cols - (2 * kWidthMargin);
-	const int kROIHeight = originalImage.rows - (2 * kHeightMargin);
-	const cv::Rect kROI(kWidthMargin, kHeightMargin, kROIWidth, kROIHeight);
-
-	const int kTotalPixelsInROI = kROI.area();									// ROI내부에 존재하는 총 픽셀수
-	const double kHighThresholdToHighSatImage = 0.65;							// 무채색 이미지이기 위한 Saturation 기준 비율, ROI내부픽셀의 80%(=0.65)가 저채도 => 저채도이미지이다.
-	const double kLowThresholdToHaveHighSatImage = 0.3;							// 유채색 차량(ex. 하늘색)을 포함하는 이미지는 Saturation 비율이 30%(=0.3) 이하이다.
-
-	std::unordered_map<int, MeanShiftCluster> clusters; 						// Cluster 모음, Key = Label, Value = Cluster
-	cv::pyrMeanShiftFiltering(luvOriginalImageMat, filteredImageMat_luv, sp, sr);
-	cv::cvtColor(filteredImageMat_luv, filteredImageInBGR, CV_Luv2BGR);
-	cv::cvtColor(filteredImageInBGR, filteredImageInHSV, CV_BGR2HSV);
-
+	cv::Mat copiedGrayImage;
 	cv::Mat highThresholdedGradientMap;
-	cv::Mat testImage;
+	cv::Mat lowThresholdGradientMap;
 	cv::Mat yGradientMap;
+	cv::Mat edgeGradientMap;
+	cv::Mat testImage;
+	cv::Mat scratchDPImage;
+
+	in_targetImage.copyTo(testImage);
+	cv::cvtColor(in_targetImage, copiedGrayImage, CV_BGR2GRAY);
 	std::vector<std::vector<cv::Point>> shouldBeExcludedContours;
-	originalImage.copyTo(testImage);
 
 	// 원래 그레디언트 맵, 기스를 얻기 위한 그레디언트 맵 (grad_y only)
-	CaclculateGradientMap(originalImage, edgeGradientMap, 0.5, 0.5);
-	CaclculateGradientMap(originalImage, yGradientMap, 0, 1);
+	CaclculateGradientMap(in_targetImage, edgeGradientMap, 0.5, 0.5);
+	CaclculateGradientMap(in_targetImage, yGradientMap, 0, 1);
 	cv::medianBlur(edgeGradientMap, edgeGradientMap, 5);
+	out_scratchPoints.clear();
+	// 구분선등 기스영역에서 제외해야하는 Connected Component 들을 저장.
+
+	cv::threshold(edgeGradientMap, highThresholdedGradientMap, 50, 255, THRESH_BINARY);
+	yGradientMap = yGradientMap & in_carBodyBinaryImage;
+
+	std::vector<std::vector<cv::Point>> strongEdgeContours;
+	cv::findContours(highThresholdedGradientMap, strongEdgeContours, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_NONE);
+
+	for (int j = 0; j < strongEdgeContours.size(); j++)
+	{
+		double gradientContourLength = cv::arcLength(strongEdgeContours[j], true);
+		std::vector<cv::Point> innerPoints;
+		GetPointsInContour(strongEdgeContours[j], 2.5, innerPoints);
+
+		// 그레디언트 맵에서 충분히 길이가 긴 녀석은 차 구분선일 가능성이 크므로 제외해야 하는 윤곽선 목록(excludedContourLength)에 등록
+		if (gradientContourLength >= 500 || (gradientContourLength >= 10 && !IsThisContourInROI(strongEdgeContours[j], cv::Size(in_targetImage.cols, in_targetImage.rows), in_ROI)))
+		{
+			shouldBeExcludedContours.push_back(strongEdgeContours[j]);
+			cv::drawContours(testImage, strongEdgeContours, j, cv::Scalar(0, 0, 255), 2);
+		}
+		else if (gradientContourLength >= 10 && innerPoints.size() > 0
+			&& IsThisContourInROI(strongEdgeContours[j], cv::Size(in_targetImage.cols, in_targetImage.rows), in_ROI)
+			&& IsContourInsideCarBody(strongEdgeContours[j], in_carBodyContourPoints))
+		{
+			// 이쪽에 두껍게 까진 기스가 존재한다..
+			cv::drawContours(testImage, strongEdgeContours, j, cv::Scalar(255, 255, 0), 2);
+
+			unsigned int innerGrayValueMean = 0;
+			for (auto eachInnerPoint : innerPoints)
+			{
+				out_scratchPoints.push_back(eachInnerPoint);
+				uchar grayValue = copiedGrayImage.at<uchar>(eachInnerPoint);
+				innerGrayValueMean += (int)grayValue;
+			}
+
+			innerGrayValueMean /= innerPoints.size();
+
+			auto boundingRect = cv::boundingRect(strongEdgeContours[j]);
+			auto boundingRectMean = cv::sum(copiedGrayImage(boundingRect))[0];
+			boundingRectMean /= boundingRect.area();
+
+			if (std::abs(innerGrayValueMean - boundingRectMean) >= 30)
+			{
+				innerPoints.clear();
+				GetPointsInContour(strongEdgeContours[j], 1, innerPoints);
+
+				for (auto eachInnerPoint : innerPoints)
+				{
+					out_scratchPoints.push_back(eachInnerPoint);
+				}
+			}
+		}
+	}
 
 	cv::imshow("그레디언트 맵", edgeGradientMap);
-
-	// 구분선등 기스영역에서 제외해야하는 Connected Component 들을 저장.
-	{
-		cv::threshold(edgeGradientMap, highThresholdedGradientMap, 60, 255, THRESH_BINARY);
-		cv::imshow("High Thresholded 그레디언트 맵 (90-255 사이)", yGradientMap);
-		std::vector<std::vector<cv::Point>> strongEdgeContours;
-		cv::findContours(highThresholdedGradientMap, strongEdgeContours, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_NONE);
-
-		for (int j = 0; j < strongEdgeContours.size(); j++)
-		{
-			double gradientContourLength = cv::arcLength(strongEdgeContours[j], true);
-
-			// 구분선이라고 확신을 할 수 없지만, 외각 30 픽셀 밖의 영역에 걸쳐져있다면 ==> 제외한다 (어차피 여기서는 기스가 생길 수 없다는 가정)
-	/*		int marginWidth = (int)((double)originalImage.cols / 8);
-			int marginHeight = (int)((double)originalImage.rows / 8);*/
-			//cv::Rect roi(0 + marginWidth, 0 + marginHeight, originalImage.cols - (2 * marginWidth), originalImage.rows - (2 * marginHeight));
-
-			// 그레디언트 맵에서 충분히 길이가 긴 녀석은 차 구분선일 가능성이 크므로 제외해야 하는 윤곽선 목록(excludedContourLength)에 등록
-			if (gradientContourLength >= 500 || (gradientContourLength >= 10 && !IsThisContourInROI(strongEdgeContours[j], cv::Size(originalImage.cols, originalImage.rows), kROI)))
-			{
-				shouldBeExcludedContours.push_back(strongEdgeContours[j]);
-				cv::drawContours(testImage, strongEdgeContours, j, cv::Scalar(rand() % 256, rand() % 256, rand() % 256), 2);
-			}
-		}
-	}
+	cv::imshow("y Gradient 그레디언트 맵 (90-255 사이)", yGradientMap);
 	cv::imshow("구분선 및 외각지역을 침범하고 있는 윤곽선들 ==> 코너점 검출 제외 대상", testImage);
 
-	cv::Mat hsvPlanes[3];
-	cv::Mat LUVPlanes[3];
-	cv::split(filteredImageMat_luv, LUVPlanes);
-	cv::split(filteredImageInHSV, hsvPlanes);
-
-	std::vector<int> hueArray(kHueIntervals);
-	std::vector<int> satArray(kSatIntervals);
-
-	cv::Mat colorMapOfHue;
-	cv::applyColorMap(hsvPlanes[0], colorMapOfHue, COLORMAP_HOT);
-
-	cv::Mat colorMapOfSat;
-	cv::applyColorMap(hsvPlanes[1], colorMapOfSat, COLORMAP_HOT);
-
-
-	// 이미지의 색상 분포를 파악하는데 사용
-	// Hue분포, Saturation 분포 계산
-	for (int rowIndex = (int)((double)originalImage.rows / kROIParameter_Dividier) - 1; rowIndex < (int)((double)originalImage.rows * (kROIParameter_Dividier - 1) / kROIParameter_Dividier); ++rowIndex)
-	{
-		for (int colIndex = (int)((double)originalImage.cols / kROIParameter_Dividier) - 1; colIndex < (int)((double)originalImage.cols * (kROIParameter_Dividier - 1) / kROIParameter_Dividier); ++colIndex)
-		{
-			hueArray[(int)(hsvPlanes[0].at<uchar>(rowIndex, colIndex) / (180 / kHueIntervals))]++;
-			satArray[(int)(hsvPlanes[1].at<uchar>(rowIndex, colIndex) / (256 / kSatIntervals))]++;
-		}
-	}
-
-	// 0.65를 넘어서면 이건 흰색 차량이야.
-	// 이미지에서 대부분의 픽셀이 무채색임. (0.65란 전체이미지 픽셀 중 65%가 0에 가까운 채도이다.)
-	float lowSaturationPixelRatio = (float)(satArray[0] + satArray[1] + satArray[2]) / kTotalPixelsInROI;
-	cv::Mat lastBinaryImage(originalImage.rows, originalImage.cols, CV_8UC1, cv::Scalar::all(0));
-	bool bImageHasLowSaturationCarColor = (lowSaturationPixelRatio > kHighThresholdToHighSatImage);
-	bool bImageHasCertainColor = (lowSaturationPixelRatio < 0.3);
-	if (bImageHasLowSaturationCarColor)
-	{
-		cv::Mat saturationBinaryImage;
-		cv::Mat valueBinaryImage;
-
-		cv::inRange(hsvPlanes[1], 0, 40, saturationBinaryImage);
-		// 명도가 90에서 255사이인 영역을 뽑아내자.
-		cv::threshold(hsvPlanes[2], valueBinaryImage, 90, 255, CV_THRESH_BINARY);
-		// 이미지에서 채도가 낮으면서 명도는 일정 값 이상하는 영역을 가려낸다.
-		// 흰색차량(무채색)의 프레임은 보통 명도가 일정 값 이상이면서 채도가 낮다.
-		lastBinaryImage = saturationBinaryImage & valueBinaryImage;
-
-		cv::medianBlur(lastBinaryImage, lastBinaryImage, 7);
-	}
-
-	// 채색 (색이 있는!) 차량이면 (새빨강 차량, 하늘색차량)
-	else if (bImageHasCertainColor)
-	{
-		cv::Mat hueThresholdedImage;
-		const float kThresholdPercentageToBeMajorHue = 0.6;
-
-		// 이미지에서 가장 주된 Hue값은 무엇인지 구하자.
-		auto maxHueIndex = FindMaxIndexInArray<int>(hueArray, hueArray.size());
-		// 그 주된 Hue값이 60%이상을 차지하는 Major한 Hue값인지 판단
-		bool bIsThisHueMajority = (float)(hueArray[maxHueIndex] / (kROI.area())) > kThresholdPercentageToBeMajorHue;
-
-		if (true)
-		{
-			// To reduce noise.
-			cv::inRange(hsvPlanes[0], maxHueIndex * (180 / kHueIntervals), (maxHueIndex + 1) * (180 / kHueIntervals), hueThresholdedImage);
-			cv::medianBlur(hueThresholdedImage, hueThresholdedImage, 5);
-			lastBinaryImage = hueThresholdedImage;
-		}
-	}
-	else
-	{
-		lastBinaryImage.release();
-	}
-
 	// 잘 구분이 되서 차 프레임을 걸러낸 경우 (==lastBinaryImage가 존재하는경우)
-	if (lastBinaryImage.data)
+	if (in_carBodyBinaryImage.data)
 	{
 		// 차 프레임을 포함하는 이진화 영상 표시
-		cv::imshow("Binary Image", lastBinaryImage);
+		cv::imshow("Binary Image", in_carBodyBinaryImage);
 
-		std::vector<std::vector<cv::Point>> carBodyContours;
-		cv::findContours(lastBinaryImage, carBodyContours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_NONE);
-
-		// Contour중 가장 긴 녀석이 차체 프레임이라고 할 수 있음
-		int currentMax = 0;
-		int currentMaxIndex = 0;
-		for (int i = 0; i < carBodyContours.size(); ++i)
-		{
-			if (currentMax < carBodyContours[i].size())
-			{
-				currentMax = carBodyContours[i].size();
-				currentMaxIndex = i;
-			}
-		}
 		std::vector<cv::Point2f> corners;
 
-		cv::goodFeaturesToTrack(copiedGrayImage(kROI), corners, 1200, 0.01, 1, cv::Mat(), 3, false, 0.04);
+		cv::goodFeaturesToTrack(copiedGrayImage(in_ROI), corners, 1200, 0.01, 1, cv::Mat(), 3, false, 0.04);
 		for (auto& point : corners)
 		{
-			point.x += kROI.x;
-			point.y += kROI.y;
+			point.x += in_ROI.x;
+			point.y += in_ROI.y;
 		}
-
 
 		// 검출한 코너들을 순회하며, Scratch 가능성이 있는 코너들을 점으로 표시함.
 		for (auto& point : corners)
@@ -793,19 +736,153 @@ bool ExtractCarBody(const cv::Mat & in_srcImage, const AlgorithmParameter& in_pa
 
 			// 코너점 중에서 Gradient 가 어느정도 크기가 되어서 의미있어야 하며
 			// 코너점은 메인차체 내부에 있거나 근처에 있어야함.
-			if (yGradientMap.at<uchar>(point) >= 12 && (cv::pointPolygonTest(carBodyContours[currentMaxIndex], point, false) > 0))
+			if (yGradientMap.at<uchar>(point) >= 12 && (cv::pointPolygonTest(in_carBodyContourPoints, point, false) > 0))
 			{
 				// 코너점이 차 구분선 근처에 있지 않는 경우만 의미있음
-				if (IsThisPointCloseToContour(shouldBeExcludedContours, point, 5) == false && lastBinaryImage.at<uchar>(point) > 0 && IsThisPointInsideOneOfContours(shouldBeExcludedContours, point) == false)
+				if (IsThisPointCloseToContour(shouldBeExcludedContours, point, 5) == false && in_carBodyBinaryImage.at<uchar>(point) > 0 && !IsThisPointInsideOneOfContours(shouldBeExcludedContours, point))
 				{
-					cv::circle(originalImage, point, 1, cv::Scalar(0, 255, 0), 2);
+					out_scratchPoints.push_back(point);
 				}
 			}
 		}
 	}
+}
+#pragma optimize("gpsy", on)
 
-	cv::rectangle(originalImage, kROI, cv::Scalar(0, 0, 255), 2);
-	cv::imshow("Result", originalImage);
+#pragma optimize("gpsy", off)
+bool ExtractCarBody(const cv::Mat& in_srcImage, const cv::Rect in_ROI, cv::Mat& out_carBodyBinaryImage, std::vector<cv::Point>& out_carBodyContour,
+	const AlgorithmParameter& in_parameter, AlgorithmResult& out_finalParameter)
+{
+	cv::Mat originalImage, copiedGrayImage, originalHSVImage, filteredImageMat_luv, luvOriginalImageMat, filteredImageInBGR, filteredImageInHSV, labelMap, edgeGradientMap;
+
+	in_srcImage.copyTo(originalImage);											// 입력받은 이미지를 deep copy해옴.
+
+	cv::cvtColor(originalImage, copiedGrayImage, CV_BGR2GRAY);					// 입력받은 이미지 그레이스케일 화
+	cv::cvtColor(originalImage, luvOriginalImageMat, CV_BGR2Luv);				// 원본이미지 Color Space 변환 (BGR -> Luv)
+	cv::cvtColor(originalImage, originalHSVImage, CV_BGR2HSV);
+
+	const int kTotalPixels = originalImage.total();								// 총 픽셀수 저장
+	const int kHueIntervals = 9;												// Hue histogram 만들 때 사용할, Bin의 갯수
+	const int kSatIntervals = 16;												// Saturation histogram 만들 때 사용할, Bin의 갯수
+																				// ROI 설정
+	const int kROIWidth = in_ROI.width;
+	const int kROIHeight = in_ROI.height;
+
+	const int kTotalPixelsInROI = in_ROI.area();									// ROI내부에 존재하는 총 픽셀수
+	const double kHighThresholdToHighSatImage = 0.65;							// 무채색 이미지이기 위한 Saturation 기준 비율, ROI내부픽셀의 80%(=0.65)가 저채도 => 저채도이미지이다.
+	const double kLowThresholdToHaveHighSatImage = 0.3;							// 유채색 차량(ex. 하늘색)을 포함하는 이미지는 Saturation 비율이 30%(=0.3) 이하이다.
+
+	cv::Mat hsvPlanes[3];
+	cv::Mat LUVPlanes[3];
+	std::vector<int> hueArray(kHueIntervals);
+	std::vector<int> satArray(kSatIntervals);
+
+	cv::pyrMeanShiftFiltering(luvOriginalImageMat, filteredImageMat_luv, 10, 16);
+	std::unordered_map<int, MeanShiftCluster> clusters; 						// Cluster 모음, Key = Label, Value = Cluster
+	PerformClustering(filteredImageMat_luv, in_ROI, 100, labelMap, clusters);
+	int bigClusterLabel;
+	FindBiggestCluster(clusters, bigClusterLabel);
+
+	cv::cvtColor(filteredImageMat_luv, filteredImageInBGR, CV_Luv2BGR);
+	cv::cvtColor(filteredImageInBGR, filteredImageInHSV, CV_BGR2HSV);
+
+	cv::split(filteredImageMat_luv, LUVPlanes);
+	cv::split(filteredImageInHSV, hsvPlanes);
+
+	cv::Mat colorMapOfHue;
+	cv::applyColorMap(hsvPlanes[0], colorMapOfHue, COLORMAP_HOT);
+
+	cv::Mat colorMapOfSat;
+	cv::applyColorMap(hsvPlanes[1], colorMapOfSat, COLORMAP_HOT);
+
+	uchar biggestClusterHValue = clusters[bigClusterLabel].GetHSVColor().x;
+	uchar biggestClusterVValue = clusters[bigClusterLabel].GetHSVColor().z;
+
+	// 이미지의 색상 분포를 파악하는데 사용
+	// Hue분포, Saturation 분포 계산
+	for (int rowIndex = in_ROI.y; rowIndex < in_ROI.y + in_ROI.height; ++rowIndex)
+	{
+		for (int colIndex = in_ROI.x; colIndex < in_ROI.x + in_ROI.width; ++colIndex)
+		{
+			hueArray[(int)(hsvPlanes[0].at<uchar>(rowIndex, colIndex) / (180 / kHueIntervals))]++;
+			satArray[(int)(hsvPlanes[1].at<uchar>(rowIndex, colIndex) / (256 / kSatIntervals))]++;
+		}
+	}
+
+	// 0.65를 넘어서면 이건 흰색 차량이야.
+	// 이미지에서 대부분의 픽셀이 무채색임. (0.65란 전체이미지 픽셀 중 65%가 0에 가까운 채도이다.)
+	float lowSaturationPixelRatio = (float)(satArray[0] + satArray[1] + satArray[2]) / kTotalPixelsInROI;
+	cv::Mat lastBinaryImage(originalImage.rows, originalImage.cols, CV_8UC1, cv::Scalar::all(0));
+	cv::Mat whiteInRoiMat;
+	lastBinaryImage(in_ROI) = 255;
+
+	bool bImageHasLowSaturationCarColor = (lowSaturationPixelRatio > kHighThresholdToHighSatImage);
+	bool bImageHasCertainColor = (lowSaturationPixelRatio < 0.3);
+	if (bImageHasLowSaturationCarColor)
+	{
+		cv::Mat saturationBinaryImage;
+		cv::Mat valueBinaryImage;
+
+		cv::inRange(hsvPlanes[1], 0, 40, saturationBinaryImage);
+		// 명도가 90에서 255사이인 영역을 뽑아내자.
+		cv::inRange(hsvPlanes[2], biggestClusterVValue - 30, biggestClusterVValue + 30, valueBinaryImage);
+
+		// 이미지에서 채도가 낮으면서 명도는 일정 값 이상하는 영역을 가려낸다.
+		// 흰색차량(무채색)의 프레임은 보통 명도가 일정 값 이상이면서 채도가 낮다.
+		lastBinaryImage = lastBinaryImage & saturationBinaryImage & valueBinaryImage;
+	}
+
+	// 채색 (색이 있는!) 차량이면 (새빨강 차량, 하늘색차량)
+	else if (bImageHasCertainColor)
+	{
+		cv::Mat hueThresholdedImage;
+		const float kThresholdPercentageToBeMajorHue = 0.6;
+
+		// 이미지에서 가장 주된 Hue값은 무엇인지 구하자.
+		auto maxHueIndex = FindMaxIndexInArray<int>(hueArray, hueArray.size());
+		// 그 주된 Hue값이 60%이상을 차지하는 Major한 Hue값인지 판단
+		bool bIsThisHueMajority = (float)(hueArray[maxHueIndex] / (in_ROI.area())) > kThresholdPercentageToBeMajorHue;
+
+		cv::Mat hueBinaryImage;
+		cv::Mat valBinaryImage;
+
+		// To reduce noise.
+		//cv::inRange(hsvPlanes[0], maxHueIndex * (180 / kHueIntervals), (maxHueIndex + 1) * (180 / kHueIntervals), hueBinaryImage);
+		//cv::medianBlur(hueThresholdedImage, hueThresholdedImage, 5);
+
+		cv::inRange(hsvPlanes[0], biggestClusterHValue - 20, biggestClusterHValue + 20, hueBinaryImage);
+		cv::inRange(hsvPlanes[2], biggestClusterVValue - 30, biggestClusterVValue + 30, valBinaryImage);
+
+		lastBinaryImage = lastBinaryImage & hueBinaryImage & valBinaryImage;
+	}
+	else
+	{
+		lastBinaryImage.release();
+	}
+
+	if (lastBinaryImage.data)
+	{
+		// Segmented 이미지를 median blur
+		cv::medianBlur(lastBinaryImage, lastBinaryImage, 7);
+
+		std::vector<std::vector<cv::Point>> carBodyContours;
+		cv::findContours(lastBinaryImage, carBodyContours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_NONE);
+
+		// Contour중 가장 긴 녀석이 차체 프레임이라고 할 수 있음
+		int currentMax = 0;
+		int currentMaxIndex = 0;
+		for (int i = 0; i < carBodyContours.size(); ++i)
+		{
+			if (currentMax < carBodyContours[i].size())
+			{
+				currentMax = carBodyContours[i].size();
+				currentMaxIndex = i;
+			}
+		}
+
+		out_carBodyBinaryImage = lastBinaryImage;
+		out_carBodyContour = carBodyContours[currentMaxIndex];
+	}
 	return true;
 }
 #pragma optimize("gpsy", on)

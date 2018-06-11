@@ -22,7 +22,7 @@ public:
 	double m_colorBandwidth;
 	// 민쉬프트 세그멘테이션 결과도 구할 것인지
 	bool m_bGetMeanShiftSegmentationResult;
-		
+
 	// 컬러 레이블맵을 얻을 것인지
 	bool m_bGetColorLabelMap;
 
@@ -82,15 +82,15 @@ public:
 		TotalElapsedTime
 	};
 
-	inline cv::Mat& GetResultMat() 
+	inline cv::Mat& GetResultMat()
 	{
 		return m_resultMat;
 	}
-	inline cv::Mat& GetSegmentedMat() 
+	inline cv::Mat& GetSegmentedMat()
 	{
 		return m_segmentedMat;
 	}
-	inline cv::Mat& GetClusteredMat() 
+	inline cv::Mat& GetClusteredMat()
 	{
 		return m_clusteredMat;
 	}
@@ -110,7 +110,7 @@ public:
 	{
 		return m_finalLDivider;
 	}
-	
+
 public:
 	void SetElapsedTime(TimerIdentifier in_identifier, double in_time)
 	{
@@ -163,11 +163,6 @@ private:
 	double m_finalLDivider;
 };
 
-/************************************************************************/
-/**************			Clinet Functions					*************/
-/************************************************************************/
-// 입력된 이미지에서, 바디부분만 뽑아낸다.
-bool ExtractCarBody(const cv::Mat& in_srcImage, const AlgorithmParameter& in_parameter, AlgorithmResult& out_finalParameter);
 
 /************************************************************************/
 /**************			Internal Functions					*************/
@@ -181,8 +176,7 @@ void CaclculateGradientMap(const cv::Mat &in_imageMat, cv::Mat& out_edgeMap, dou
 // Blob Detection을 통해 결함이 있을만한 영역을 찾는다.
 void FindPossibleDefectAreasUsingBlobDetection(const cv::Mat &in_imageMat, const std::vector<cv::Point> &out_centerPointsOfPossibleAreas);
 
-// Contour안에 존재하는 Points들을 얻는다.
-void GetPointsInContour(const cv::Size& in_imageSize, const std::vector<cv::Point> &in_contour, std::vector<cv::Point> &out_insidePoints);
+
 
 // in_cluster (입력받은 클러스터)를 기준으로 Label Map을 업데이트 한다. 
 void UpdateLabelMap(const std::unordered_map<int, MeanShiftCluster>& in_clusters, cv::Mat& inout_labelMap);
@@ -222,3 +216,22 @@ bool IsThisPointInsideOneOfContours(const std::vector<std::vector<cv::Point>> &i
 cv::Scalar GetAverageColorOfPointsArray(cv::Mat in_srcImage, const std::vector<cv::Point> &in_points);
 bool IsThisContourInROI(const std::vector<cv::Point>& in_points, const cv::Size in_imageSize, const cv::Rect in_ROI);
 bool IsThisPointInROI(const cv::Rect in_roi, const cv::Point in_point);
+
+
+/************************************************************************/
+/**************			Clinet Functions					*************/
+/************************************************************************/
+
+
+bool IsContourInsideCarBody(const std::vector<cv::Point>& in_contour, const std::vector<cv::Point>& in_carBodyContourPoints);
+
+// Contour안에 존재하는 Points들을 얻는다.
+void GetPointsInContour(const std::vector<cv::Point> &in_contour, const double in_distanceFromBoundaryToBeInsidePoint, std::vector<cv::Point> &out_insidePoints);
+
+// 입력된 이미지에서, 바디부분만 뽑아낸다.
+bool ExtractCarBody(const cv::Mat& in_srcImage, const cv::Rect in_ROI, cv::Mat& out_carBodyBinaryImage, std::vector<cv::Point>& out_carBodyContour,
+	const AlgorithmParameter& in_parameter, AlgorithmResult& out_finalParameter);
+
+// 스크래치 영역을 
+void DetectScratchPointsFromExtractionResult(const cv::Mat in_targetImage, const cv::Rect in_ROI, const cv::Mat in_carBodyBinaryImage, const std::vector<cv::Point> in_carBodyContourPoints,
+	std::vector<cv::Point> &out_scratchPoints);

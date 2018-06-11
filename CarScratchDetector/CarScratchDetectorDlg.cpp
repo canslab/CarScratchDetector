@@ -58,7 +58,7 @@ BOOL CCarScratchDetectorDlg::OnInitDialog()
 	SetIcon(m_hIcon, TRUE);			// 큰 아이콘을 설정합니다.
 	SetIcon(m_hIcon, FALSE);		// 작은 아이콘을 설정합니다.
 
-	// TODO: 여기에 추가 초기화 작업을 추가합니다.	
+									// TODO: 여기에 추가 초기화 작업을 추가합니다.	
 	m_spatialRadiusEditBox.SetWindowTextA("10");
 	m_colorRadiusEditBox.SetWindowTextA("16");
 
@@ -67,7 +67,7 @@ BOOL CCarScratchDetectorDlg::OnInitDialog()
 	m_bCheckLabelMap.SetCheck(0);
 	m_bCheckContourMap.SetCheck(0);
 	m_bGradientMapCheck.SetCheck(0);
-	
+
 	GetDlgItem(IDC_ANALYZEBTN)->EnableWindow(FALSE);
 	GetDlgItem(IDC_RUNBUTTON)->EnableWindow(FALSE);
 	GetDlgItem(IDC_CLEARBTN)->EnableWindow(FALSE);
@@ -186,7 +186,7 @@ void CCarScratchDetectorDlg::OnBnClickedRunbutton()
 
 	param.m_spatialBandwidth = atof(spatialRadiusString);
 	param.m_colorBandwidth = atof(colorRadiusString);
-	
+
 	param.m_bGetGradientMap = IsDlgButtonChecked(IDC_GRADIENTMAPCHECK);
 	param.m_bGetColorLabelMap = IsDlgButtonChecked(IDC_LABELMAPCHECK);
 	param.m_bGetCornerMap = IsDlgButtonChecked(IDC_CORNERMAPCHECK);
@@ -194,7 +194,33 @@ void CCarScratchDetectorDlg::OnBnClickedRunbutton()
 
 	if (m_srcMat.data != nullptr)
 	{
-		ExtractCarBody(m_srcMat, param, result);
+		// ROI 만들기
+		const int kROIParameter_Dividier = 8;										// ROI를 만들 때, Width, Height를 각각 몇 등분할지 나타냄. 
+		const int kWidthMargin = m_srcMat.cols / kROIParameter_Dividier;
+		const int kHeightMargin = m_srcMat.rows / kROIParameter_Dividier;
+		const int kROIWidth = m_srcMat.cols - (2 * kWidthMargin);
+		const int kROIHeight = m_srcMat.rows - (2 * kHeightMargin);
+		const cv::Rect kROI(kWidthMargin, kHeightMargin, kROIWidth, kROIHeight);
+
+		cv::Mat carBodyBinaryImage;
+		std::vector<cv::Point> carBodyContourPoints;
+		std::vector<cv::Point> scratchPoints;
+
+		ExtractCarBody(m_srcMat, kROI, carBodyBinaryImage, carBodyContourPoints, param, result);
+
+		DetectScratchPointsFromExtractionResult(m_srcMat, kROI, carBodyBinaryImage, carBodyContourPoints, scratchPoints);
+
+		cv::Mat forDp;
+		m_srcMat.copyTo(forDp);
+
+		for (auto& point : scratchPoints)
+		{
+			cv::circle(forDp, point, 1, cv::Scalar(0, 0, 255), 2);
+		}
+
+		cv::rectangle(forDp, kROI, cv::Scalar(0, 255, 0), 2);
+		cv::imshow("Result", forDp);
+
 		GetDlgItem(IDC_ANALYZEBTN)->EnableWindow(TRUE);
 	}
 }
@@ -223,7 +249,7 @@ void CCarScratchDetectorDlg::OnBnClickedSaveresultbtn()
 void CCarScratchDetectorDlg::OnBnClickedAnalyze()
 {
 	// TODO: Add your control notification handler code here
-	
+
 }
 
 void CCarScratchDetectorDlg::OnBnClickedClearbtn()
