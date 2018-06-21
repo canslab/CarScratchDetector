@@ -43,6 +43,22 @@ public:
 	{
 		return m_points;
 	}
+	int GetSize() const
+	{
+		return m_points.size();
+	}
+	void GetVectorVersion(std::vector<cv::Point2f> &out_clusterVectorVersion) const 
+	{
+		out_clusterVectorVersion.clear();
+		out_clusterVectorVersion.resize(m_points.size());
+		int idx = 0;
+		for (auto& eachPoint : m_points)
+		{
+			out_clusterVectorVersion[idx] = eachPoint->m_point;
+			idx++;
+		}
+	}
+
 private:
 	std::list<Point_DBSCAN*> m_points;
 };

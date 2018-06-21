@@ -63,6 +63,15 @@
     <ClInclude Include="ClusterForDBSCAN.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="FeatureDialog.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="RankingDialog.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="TrainingDialog.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="CarScratchDetector.cpp">
@@ -95,6 +104,15 @@
     <ClCompile Include="ClusterForDBSCAN.cpp">
       <Filter>AlgorithmCode</Filter>
     </ClCompile>
+    <ClCompile Include="FeatureDialog.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="RankingDialog.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="TrainingDialog.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="CarScratchDetector.rc">
@@ -104,6 +122,9 @@
   <ItemGroup>
     <None Include="res\CarScratchDetector.rc2">
       <Filter>Resource Files</Filter>
+    </None>
+    <None Include="resource.hm">
+      <Filter>Header Files</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>

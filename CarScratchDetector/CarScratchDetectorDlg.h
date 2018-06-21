@@ -4,6 +4,7 @@
 
 #pragma once
 #include <opencv2\opencv.hpp>
+#include "AlgorithmCode\AlgorithmCollection.h"
 #include "afxwin.h"
 
 // CCarScratchDetectorDlg 대화 상자
@@ -26,7 +27,7 @@ public:
 protected:
 	HICON m_hIcon;
 
-	cv::Mat m_srcMat;
+	cv::Mat m_currentMat;
 	cv::Mat m_resultMat;
 	
 
@@ -37,21 +38,19 @@ protected:
 	DECLARE_MESSAGE_MAP()
 public:
 	afx_msg void OnBnClickedOpenimagefilebtn();
-	afx_msg void OnBnClickedShowbodypart();
-	afx_msg void OnBnClickedRunbutton();
 	CStatic m_imageWidthText;
 	CStatic m_imageHeightText;
-	afx_msg void OnBnClickedSaveresultbtn();
 	CEdit m_spatialRadiusEditBox;
 	CEdit m_colorRadiusEditBox;
-//	CButton m_bCheckEdgeMap;
-	CButton m_bCheckLabelMap;
-	CButton m_bCheckCornerMap;
-	afx_msg void OnBnClickedAnalyze();
-//	CButton m_anaylzeButton;
 	afx_msg void OnBnClickedClearbtn();
-//	CButton m_bBodyMap;
-//	CButton m_bCheckBodyMap;
-	CButton m_bCheckContourMap;
-	CButton m_bGradientMapCheck;
+
+private:
+	std::string m_currentFileName;
+	ImageDescriptor m_currentImageDescriptor;
+	std::map<std::string, ImageDescriptor> m_loadedImageDescriptorsMap;
+
+public:
+	afx_msg void OnCurrentImageTestButton();
+	afx_msg void OnBnClickedLoaddbbutton();
+	afx_msg void OnBnClickedTrainingsessionbutton();
 };

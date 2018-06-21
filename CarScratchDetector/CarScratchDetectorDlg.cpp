@@ -8,6 +8,11 @@
 #include "afxdialogex.h"
 #include "AlgorithmCode\AlgorithmCollection.h"
 #include "CarNumberRemoveCode\LPdetection.h"
+#include "FeatureDialog.h"
+#include "RankingDialog.h"
+#include "TrainingDialog.h"
+#include <fstream>
+
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -24,28 +29,20 @@ CCarScratchDetectorDlg::CCarScratchDetectorDlg(CWnd* pParent /*=NULL*/)
 void CCarScratchDetectorDlg::DoDataExchange(CDataExchange* pDX)
 {
 	CDialogEx::DoDataExchange(pDX);
-	DDX_Control(pDX, IDC_INPUTIMAGEWIDTH, m_imageWidthText);
-	DDX_Control(pDX, IDC_INPUTIMAGEHEIGHT, m_imageHeightText);
+	DDX_Control(pDX, IDC_INPUTIMAGEWIDTHTEXT, m_imageWidthText);
+	DDX_Control(pDX, IDC_INPUTIMAGEHEIGHTTEXT, m_imageHeightText);
 	DDX_Control(pDX, IDC_SPATIALRADIUSEDIT, m_spatialRadiusEditBox);
 	DDX_Control(pDX, IDC_COLORRADIUSEDIT, m_colorRadiusEditBox);
-	//  DDX_Control(pDX, IDC_EDGEMAPCHECK, m_bCheckEdgeMap);
-	DDX_Control(pDX, IDC_LABELMAPCHECK, m_bCheckLabelMap);
-	DDX_Control(pDX, IDC_CORNERMAPCHECK, m_bCheckCornerMap);
-	//  DDX_Control(pDX, IDC_ANALYZE, m_anaylzeButton);
-	//  DDX_Control(pDX, IDC_BODYMAPCHECK, m_bBodyMap);
-	//  DDX_Control(pDX, IDC_CONTOURMAPCHECK, m_bCheckBodyMap);
-	DDX_Control(pDX, IDC_CONTOURMAPCHECK, m_bCheckContourMap);
-	DDX_Control(pDX, IDC_GRADIENTMAPCHECK, m_bGradientMapCheck);
 }
 
 BEGIN_MESSAGE_MAP(CCarScratchDetectorDlg, CDialogEx)
 	ON_WM_PAINT()
 	ON_WM_QUERYDRAGICON()
 	ON_BN_CLICKED(IDC_OPENIMAGEFILEBTN, &CCarScratchDetectorDlg::OnBnClickedOpenimagefilebtn)
-	ON_BN_CLICKED(IDC_RUNBUTTON, &CCarScratchDetectorDlg::OnBnClickedRunbutton)
-	ON_BN_CLICKED(IDC_SAVERESULTBTN, &CCarScratchDetectorDlg::OnBnClickedSaveresultbtn)
-	ON_BN_CLICKED(IDC_ANALYZEBTN, &CCarScratchDetectorDlg::OnBnClickedAnalyze)
 	ON_BN_CLICKED(IDC_CLEARBTN, &CCarScratchDetectorDlg::OnBnClickedClearbtn)
+	ON_BN_CLICKED(IDC_BUTTON2, &CCarScratchDetectorDlg::OnCurrentImageTestButton)
+	ON_BN_CLICKED(IDC_LOADDBBUTTON, &CCarScratchDetectorDlg::OnBnClickedLoaddbbutton)
+	ON_BN_CLICKED(IDC_TRAININGSESSIONBUTTON, &CCarScratchDetectorDlg::OnBnClickedTrainingsessionbutton)
 END_MESSAGE_MAP()
 // CCarScratchDetectorDlg 메시지 처리기
 
@@ -62,19 +59,8 @@ BOOL CCarScratchDetectorDlg::OnInitDialog()
 	m_spatialRadiusEditBox.SetWindowTextA("10");
 	m_colorRadiusEditBox.SetWindowTextA("16");
 
-	// Anaylze에 해당하는 체크 박스 현재 상태
-	m_bCheckCornerMap.SetCheck(0);
-	m_bCheckLabelMap.SetCheck(0);
-	m_bCheckContourMap.SetCheck(0);
-	m_bGradientMapCheck.SetCheck(0);
-
-	GetDlgItem(IDC_ANALYZEBTN)->EnableWindow(FALSE);
-	GetDlgItem(IDC_RUNBUTTON)->EnableWindow(FALSE);
+	GetDlgItem(IDC_BUTTON2)->EnableWindow(FALSE);
 	GetDlgItem(IDC_CLEARBTN)->EnableWindow(FALSE);
-	GetDlgItem(IDC_SAVERESULTBTN)->EnableWindow(FALSE);
-	//GetDlgItem(IDC_ANA)
-	//GetDlgItem(IDC_ANALYZE)
-
 	return TRUE;  // 포커스를 컨트롤에 설정하지 않으면 TRUE를 반환합니다.
 }
 
@@ -114,6 +100,7 @@ HCURSOR CCarScratchDetectorDlg::OnQueryDragIcon()
 	return static_cast<HCURSOR>(m_hIcon);
 }
 
+#pragma optimize("gpsy", off)
 void CCarScratchDetectorDlg::OnBnClickedOpenimagefilebtn()
 {
 	// TODO: Add your control notification handler code here
@@ -123,150 +110,211 @@ void CCarScratchDetectorDlg::OnBnClickedOpenimagefilebtn()
 	if (dlg.DoModal() == IDOK)
 	{
 		CString cstrImgPath = dlg.GetPathName();
-		if (m_srcMat.rows > 0)
+
+		if (m_currentMat.rows > 0)
 		{
-			m_srcMat.release();
+			m_currentMat.release();
 		}
 
-		m_srcMat = cv::imread(cv::String(cstrImgPath).c_str());
+		m_currentMat = cv::imread(cv::String(cstrImgPath).c_str());
+		auto originalWidth = m_currentMat.cols;
+		auto originalHeight = m_currentMat.rows;
 
-		RemoveNumberPlate(m_srcMat);
-
-		// To reduce the image's resolution.
-		double aspectRatio = (double)m_srcMat.rows / m_srcMat.cols;
-		int resizedWidth = 0, resizedHeight = 0, accValue = 0, totalPixel = 0;
-
-		do
-		{
-			accValue += 10;
-			totalPixel = (int)(accValue * accValue * aspectRatio);
-
-		} while (totalPixel <= 100000);
-
-		resizedWidth = accValue;
-		resizedHeight = aspectRatio * accValue;
-
-		if (resizedWidth <= m_srcMat.cols && resizedHeight <= m_srcMat.rows)
-		{
-			// 이미지 사이즈 조정
-			cv::resize(m_srcMat, m_srcMat, cv::Size(resizedWidth, resizedHeight));
-		}
+		RemoveNumberPlate(m_currentMat);
+		ResizeImageUsingThreshold(m_currentMat, 100000);
 
 		// If input image exists
-		if (m_srcMat.data)
+		if (m_currentMat.data)
 		{
-			m_imageWidthText.SetWindowTextA(std::to_string(m_srcMat.cols).c_str());
-			m_imageHeightText.SetWindowTextA(std::to_string(m_srcMat.rows).c_str());
+			cv::imshow("Current Input Image", m_currentMat);
+			m_imageWidthText.SetWindowTextA(std::to_string(m_currentMat.cols).c_str());
+			m_imageHeightText.SetWindowTextA(std::to_string(m_currentMat.rows).c_str());
 			GetDlgItem(IDC_OPENIMAGEFILEBTN)->EnableWindow(FALSE);
-			GetDlgItem(IDC_ANALYZEBTN)->EnableWindow(TRUE);
-			GetDlgItem(IDC_RUNBUTTON)->EnableWindow(TRUE);
 			GetDlgItem(IDC_CLEARBTN)->EnableWindow(TRUE);
-			GetDlgItem(IDC_SAVERESULTBTN)->EnableWindow(TRUE);
-		}
-		cv::imshow("Input Image", m_srcMat);
-	}
-}
+			
+			// Get current file's name
+			m_currentFileName = dlg.GetFileTitle();
 
-void CCarScratchDetectorDlg::OnBnClickedShowbodypart()
-{
+			// Extract image descriptor from m_currentMat
+			ExtractImageDescriptorFromMat(m_currentMat, m_currentImageDescriptor, true);
 
-}
+			// Label UI Update
+			std::string averagePointText = "(" + std::to_string(m_currentImageDescriptor.m_largestClusterMeanPosition.x)
+				+ ", " + std::to_string(m_currentImageDescriptor.m_largestClusterMeanPosition.y) + ")";
+			GetDlgItem(IDC_LARGESTCLUSTERAVERAGEPOINTTEXT)->SetWindowTextA(averagePointText.c_str());
+			GetDlgItem(IDC_LARGESTCLUSTERXSTDDEVTEXT)->SetWindowTextA(std::to_string(m_currentImageDescriptor.m_largestClusterStdDev[0]).c_str());
+			GetDlgItem(IDC_LARGESTCLUSTERYSTDDEVTEXT)->SetWindowTextA(std::to_string(m_currentImageDescriptor.m_largestClusterStdDev[1]).c_str());
+			GetDlgItem(IDC_LARGESTCLUSTERSKEWNESSTEXT)->SetWindowTextA(std::to_string(m_currentImageDescriptor.m_largestClusterSkewness).c_str());
+			GetDlgItem(IDC_LARGESTCLUSTERORIENTATIONTEXT)->SetWindowTextA(std::to_string(m_currentImageDescriptor.m_largestClusterOrientation).c_str());
+			GetDlgItem(IDC_LARGESTCLUSTERLARGEEIGVALUETEXT)->SetWindowTextA(std::to_string(m_currentImageDescriptor.m_largestClusterLargeEigenValue).c_str());
+			GetDlgItem(IDC_LARGESTCLUSTERSMALLEIGVALUETEXT)->SetWindowTextA(std::to_string(m_currentImageDescriptor.m_largestClusterSmallEigenValue).c_str());
+			GetDlgItem(IDC_LARGESTCLUSTEREIGVALUERATIOTEXT)->SetWindowTextA(std::to_string(m_currentImageDescriptor.m_largestClusterEigenvalueRatio).c_str());
+			GetDlgItem(IDC_LARGESTCLUSTERTOTALPOINTSTEXT)->SetWindowTextA(std::to_string(m_currentImageDescriptor.m_totalNumberOfPointsOfLargestCluster).c_str());
 
-void CCarScratchDetectorDlg::OnBnClickedRunbutton()
-{
-	// TODO: Add your control notification handler code here
-	//ExtractCarBody
+			averagePointText = "(" + std::to_string(m_currentImageDescriptor.m_globalMeanPosition.x)
+				+ ", " + std::to_string(m_currentImageDescriptor.m_globalMeanPosition.y) + ")";
+			GetDlgItem(IDC_TOTALNUMBEROFPOINTSTEXT)->SetWindowTextA(std::to_string(m_currentImageDescriptor.m_totalNumberOfPointsInROI).c_str());
+			GetDlgItem(IDC_AVERAGEPOINTTEXT)->SetWindowTextA(averagePointText.c_str());
+			GetDlgItem(IDC_XSTDDEVTEXT)->SetWindowTextA(std::to_string(m_currentImageDescriptor.m_globalStdDev[0]).c_str());
+			GetDlgItem(IDC_YSTDDEVTEXT)->SetWindowTextA(std::to_string(m_currentImageDescriptor.m_globalStdDev[1]).c_str());
+			GetDlgItem(IDC_SKEWNESSTEXT)->SetWindowTextA(std::to_string(m_currentImageDescriptor.m_globalSkewness).c_str());
 
-	AlgorithmParameter param;
-	AlgorithmResult result;
-
-	CString spatialRadiusString, colorRadiusString;
-	m_spatialRadiusEditBox.GetWindowTextA(spatialRadiusString);
-	m_colorRadiusEditBox.GetWindowTextA(colorRadiusString);
-
-	param.m_spatialBandwidth = atof(spatialRadiusString);
-	param.m_colorBandwidth = atof(colorRadiusString);
-
-	param.m_bGetGradientMap = IsDlgButtonChecked(IDC_GRADIENTMAPCHECK);
-	param.m_bGetColorLabelMap = IsDlgButtonChecked(IDC_LABELMAPCHECK);
-	param.m_bGetCornerMap = IsDlgButtonChecked(IDC_CORNERMAPCHECK);
-	param.m_bGetContouredMap = IsDlgButtonChecked(IDC_CONTOURMAPCHECK);
-
-	if (m_srcMat.data != nullptr)
-	{
-		// ROI 만들기
-		const int kROIParameter_Dividier = 8;										// ROI를 만들 때, Width, Height를 각각 몇 등분할지 나타냄. 
-		const int kWidthMargin = m_srcMat.cols / kROIParameter_Dividier;
-		const int kHeightMargin = m_srcMat.rows / kROIParameter_Dividier;
-		const int kROIWidth = m_srcMat.cols - (2 * kWidthMargin);
-		const int kROIHeight = m_srcMat.rows - (2 * kHeightMargin);
-		const cv::Rect kROI(kWidthMargin, kHeightMargin, kROIWidth, kROIHeight);
-
-		cv::Mat carBodyBinaryImage;
-		std::vector<cv::Point> carBodyContourPoints;
-		std::vector<cv::Point> scratchPoints;
-
-		ExtractCarBody(m_srcMat, kROI, carBodyBinaryImage, carBodyContourPoints, param, result);
-
-		DetectScratchPointsFromExtractionResult(m_srcMat, kROI, carBodyBinaryImage, carBodyContourPoints, scratchPoints);
-
-		cv::Mat forDp;
-		m_srcMat.copyTo(forDp);
-
-		for (auto& point : scratchPoints)
-		{
-			cv::circle(forDp, point, 1, cv::Scalar(0, 0, 255), 2);
-		}
-
-		cv::rectangle(forDp, kROI, cv::Scalar(0, 255, 0), 2);
-		cv::imshow("Result", forDp);
-
-		GetDlgItem(IDC_ANALYZEBTN)->EnableWindow(TRUE);
-	}
-}
-
-void CCarScratchDetectorDlg::OnBnClickedSaveresultbtn()
-{
-	// TODO: Add your control notification handler code here
-	char szFilter[] = "Image|*.BMP;*.PNG;*.JPG;*.JPEG";
-
-	if (m_resultMat.rows > 0)
-	{
-		CFileDialog dlg(FALSE, NULL, NULL, OFN_HIDEREADONLY, szFilter, AfxGetMainWnd());
-		if (IDOK == dlg.DoModal())
-		{
-			CString strPathName = dlg.GetPathName();
-			cv::imwrite(cv::String(strPathName) + ".jpg", m_resultMat);
-			MessageBox("Save Complete");
+			// Button UI Update
+			GetDlgItem(IDC_BUTTON2)->EnableWindow(TRUE);
+			GetDlgItem(IDC_CLEARBTN)->EnableWindow(TRUE);
 		}
 	}
-	else
-	{
-		MessageBox("Experiment Result doesn't exist");
-	}
 }
-
-void CCarScratchDetectorDlg::OnBnClickedAnalyze()
-{
-	// TODO: Add your control notification handler code here
-
-}
+#pragma optimize("gpsy", on)
 
 void CCarScratchDetectorDlg::OnBnClickedClearbtn()
 {
 	// TODO: Add your control notification handler code here
-	if (m_srcMat.data)
+	if (m_currentMat.data)
 	{
-		m_srcMat.release();
+		m_currentMat.release();
+		m_currentFileName = "";
+		m_currentImageDescriptor = ImageDescriptor();
 		GetDlgItem(IDC_OPENIMAGEFILEBTN)->EnableWindow(TRUE);
-		GetDlgItem(IDC_ANALYZEBTN)->EnableWindow(FALSE);
-		GetDlgItem(IDC_RUNBUTTON)->EnableWindow(FALSE);
 		GetDlgItem(IDC_CLEARBTN)->EnableWindow(FALSE);
-		GetDlgItem(IDC_SAVERESULTBTN)->EnableWindow(FALSE);
+		GetDlgItem(IDC_BUTTON2)->EnableWindow(FALSE);
 
 		m_imageHeightText.SetWindowTextA("N/A");
 		m_imageWidthText.SetWindowTextA("N/A");
 
 		cv::destroyAllWindows();
 	}
+}
+
+#pragma optimize("gpsy", off)
+void CCarScratchDetectorDlg::OnCurrentImageTestButton()
+{
+	if (m_currentMat.data == nullptr && m_currentImageDescriptor.m_totalNumberOfPointsInROI == 0)
+	{
+		MessageBox("Open Image Please");
+		return;
+	}
+	else
+	{
+		cv::destroyAllWindows();
+	}
+
+	auto& inputImageDescriptor = m_currentImageDescriptor;
+
+	// TODO: Add your control notification handler code here
+	double currentSmallestDistance = 1000000000000000000;
+	std::string currentSmallestFileName;
+
+	// 기존에 있던 녀석들과 현재 입력된 테스트 이미지와의 score를 계산한다.
+	std::map<std::string, double> distanceRecord;
+	for (auto& eachDescriptor : m_loadedImageDescriptorsMap)
+	{
+		auto curScore = ImageDescriptor::CalculateFeatureDistance(inputImageDescriptor, eachDescriptor.second);
+		distanceRecord[eachDescriptor.first] = curScore;
+	}
+
+	// Declaring the type of Predicate that accepts 2 pairs and return a bool
+	typedef std::function<bool(std::pair<std::string, double>, std::pair<std::string, double>)> Comparator;
+
+	// Defining a lambda function to compare two pairs. It will compare two pairs using second field
+	Comparator compFunctor =
+		[](std::pair<std::string, double> elem1, std::pair<std::string, double> elem2)
+	{
+		return elem1.second <= elem2.second;
+	};
+
+	// Declaring a set that will store the pairs using above comparision logic
+	std::set<std::pair<std::string, double>, Comparator> sortedDistanceSet(
+		distanceRecord.begin(), distanceRecord.end(), compFunctor);
+
+	int index = 0;
+	std::string result = "";
+	RankingDialog dlg;
+
+	for (auto& element : sortedDistanceSet)
+	{
+		dlg.m_fileNames.push_back(element.first);
+		dlg.m_distanceRecord.push_back(element.second);
+	}
+
+	dlg.DoModal();
+}
+#pragma optimize("gpsy", on)
+
+// Load DB Button
+#pragma optimize("gpsy", off)
+void CCarScratchDetectorDlg::OnBnClickedLoaddbbutton()
+{
+	// TODO: Add your control notification handler code here
+	char szFilter[] = "Text|*.txt";
+
+	CFileDialog dlg(TRUE, NULL, NULL, OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT, szFilter, AfxGetMainWnd());
+
+	if (dlg.DoModal() == IDOK)
+	{
+		if (m_loadedImageDescriptorsMap.size() != 0)
+		{
+			m_loadedImageDescriptorsMap.clear();
+			m_currentFileName = "";
+			m_currentImageDescriptor = ImageDescriptor();
+		}
+
+		int number_of_ImageFiles = -1;
+		std::string line;
+		std::ifstream myfile(dlg.GetPathName());
+
+		while (std::getline(myfile, line))
+		{
+			++number_of_ImageFiles;
+		}
+
+		myfile.close();
+		std::ifstream fileForRead(dlg.GetPathName());
+		std::getline(fileForRead, line);
+
+		for (int i = 0; i < number_of_ImageFiles; ++i)
+		{
+			int findIndex = 0;
+			std::string fileName;
+			fileForRead >> fileName;
+
+			if (fileName == "")
+			{
+				continue;
+			}
+
+			m_loadedImageDescriptorsMap[fileName] = ImageDescriptor();
+
+			ImageDescriptor& currentImageDescriptor = m_loadedImageDescriptorsMap[fileName];
+
+			fileForRead >> currentImageDescriptor.m_totalNumberOfPointsInROI;
+			fileForRead >> currentImageDescriptor.m_globalMeanPosition.x;
+			fileForRead >> currentImageDescriptor.m_globalMeanPosition.y;
+			fileForRead >> currentImageDescriptor.m_globalStdDev[0];
+			fileForRead >> currentImageDescriptor.m_globalStdDev[1];
+			fileForRead >> currentImageDescriptor.m_globalSkewness;
+			fileForRead >> currentImageDescriptor.m_globalDensityInROI;
+			fileForRead >> currentImageDescriptor.m_globalDensityInEffectiveROI;
+			fileForRead >> currentImageDescriptor.m_totalNumberOfPointsOfLargestCluster;
+			fileForRead >> currentImageDescriptor.m_largestClusterMeanPosition.x;
+			fileForRead >> currentImageDescriptor.m_largestClusterMeanPosition.y;
+			fileForRead >> currentImageDescriptor.m_largestClusterStdDev[0];
+			fileForRead >> currentImageDescriptor.m_largestClusterStdDev[1];
+			fileForRead >> currentImageDescriptor.m_largestClusterSkewness;
+			fileForRead >> currentImageDescriptor.m_numberOfDenseClusters;
+			fileForRead >> currentImageDescriptor.m_largestClusterEigenvalueRatio;
+			fileForRead >> currentImageDescriptor.m_largestClusterLargeEigenValue;
+			fileForRead >> currentImageDescriptor.m_largestClusterSmallEigenValue;
+			fileForRead >> currentImageDescriptor.m_largestClusterOrientation;
+		}
+	}
+}
+#pragma optimize("gpsy", on)
+
+
+void CCarScratchDetectorDlg::OnBnClickedTrainingsessionbutton()
+{
+	// TODO: Add your control notification handler code here
+	TrainingDialog dlg;
+	dlg.DoModal();
 }

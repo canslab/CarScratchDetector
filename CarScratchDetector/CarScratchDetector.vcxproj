@@ -195,9 +195,12 @@
     <ClInclude Include="CarScratchDetectorDlg.h" />
     <ClInclude Include="ClusterForDBSCAN.h" />
     <ClInclude Include="DBSCAN.h" />
+    <ClInclude Include="FeatureDialog.h" />
+    <ClInclude Include="RankingDialog.h" />
     <ClInclude Include="Resource.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="targetver.h" />
+    <ClInclude Include="TrainingDialog.h" />
     <ClInclude Include="UtilityCode\Timer.h" />
   </ItemGroup>
   <ItemGroup>
@@ -209,13 +212,17 @@
     <ClCompile Include="CarScratchDetectorDlg.cpp" />
     <ClCompile Include="ClusterForDBSCAN.cpp" />
     <ClCompile Include="DBSCAN.cpp" />
+    <ClCompile Include="FeatureDialog.cpp" />
+    <ClCompile Include="RankingDialog.cpp" />
     <ClCompile Include="stdafx.cpp" />
+    <ClCompile Include="TrainingDialog.cpp" />
     <ClCompile Include="UtilityCode\Timer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="CarScratchDetector.rc" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="resource.hm" />
     <None Include="res\CarScratchDetector.rc2" />
   </ItemGroup>
   <ItemGroup>
