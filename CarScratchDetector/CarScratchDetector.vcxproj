@@ -189,8 +189,6 @@
   <ItemGroup>
     <ClInclude Include="AlgorithmCode\AlgorithmCollection.h" />
     <ClInclude Include="AlgorithmCode\MeanShiftCluster.h" />
-    <ClInclude Include="CarNumberRemoveCode\ConnectedComponent.h" />
-    <ClInclude Include="CarNumberRemoveCode\LPdetection.h" />
     <ClInclude Include="CarScratchDetector.h" />
     <ClInclude Include="CarScratchDetectorDlg.h" />
     <ClInclude Include="ClusterForDBSCAN.h" />
@@ -206,8 +204,6 @@
   <ItemGroup>
     <ClCompile Include="AlgorithmCode\AlgorithmCollection.cpp" />
     <ClCompile Include="AlgorithmCode\MeanShiftCluster.cpp" />
-    <ClCompile Include="CarNumberRemoveCode\ConnectedComponent.cpp" />
-    <ClCompile Include="CarNumberRemoveCode\LPdetection.cpp" />
     <ClCompile Include="CarScratchDetector.cpp" />
     <ClCompile Include="CarScratchDetectorDlg.cpp" />
     <ClCompile Include="ClusterForDBSCAN.cpp" />

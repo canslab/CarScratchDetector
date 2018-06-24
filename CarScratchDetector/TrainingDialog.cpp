@@ -57,7 +57,6 @@ END_MESSAGE_MAP()
 
 // TrainingDialog message handlers
 
-#pragma optimize("gpsy", off)
 void TrainingDialog::OnBnClickedOpenimagebutton()
 {
 	char szFilter[] = "Image|*.BMP;*.PNG;*.JPG;*.JPEG";
@@ -65,14 +64,12 @@ void TrainingDialog::OnBnClickedOpenimagebutton()
 	//dlg.GetStartPosition();
 
 	POSITION pos(dlg.GetStartPosition());
-	AlgorithmParameter param;
-	AlgorithmResult result;
-	
-	
+
 	if (dlg.DoModal() == IDOK)
 	{
 		while (pos)
 		{
+
 			CString currentFilePath = dlg.GetNextPathName(pos);
 			std::string currentFileName = GetImageFileNameFromPath(currentFilePath);
 			cv::Mat currentMat;
@@ -102,7 +99,6 @@ void TrainingDialog::OnBnClickedOpenimagebutton()
 	GetDlgItem(IDC_OPENIMAGEBUTTON)->EnableWindow(FALSE);
 	GetDlgItem(IDC_DISCARDBUTTON)->EnableWindow(TRUE);
 }
-#pragma optimize("gpsy", on)
 
 void TrainingDialog::OnBnClickedDiscardbutton()
 {

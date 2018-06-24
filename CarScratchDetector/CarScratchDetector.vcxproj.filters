@@ -16,9 +16,6 @@
     <Filter Include="AlgorithmCode">
       <UniqueIdentifier>{fc46a93e-df8a-4db1-98f3-f85ab5285cb1}</UniqueIdentifier>
     </Filter>
-    <Filter Include="AlgorithmCode\NumberRemoveCode">
-      <UniqueIdentifier>{f2e967c9-b11e-4d0b-8017-16408efe06fe}</UniqueIdentifier>
-    </Filter>
     <Filter Include="AlgorithmCode\Header Files">
       <UniqueIdentifier>{861f6eeb-645a-4b96-b822-26794c2c72cd}</UniqueIdentifier>
     </Filter>
@@ -47,12 +44,6 @@
     </ClInclude>
     <ClInclude Include="AlgorithmCode\AlgorithmCollection.h">
       <Filter>AlgorithmCode\Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="CarNumberRemoveCode\ConnectedComponent.h">
-      <Filter>AlgorithmCode\NumberRemoveCode</Filter>
-    </ClInclude>
-    <ClInclude Include="CarNumberRemoveCode\LPdetection.h">
-      <Filter>AlgorithmCode\NumberRemoveCode</Filter>
     </ClInclude>
     <ClInclude Include="AlgorithmCode\MeanShiftCluster.h">
       <Filter>AlgorithmCode\Header Files</Filter>
@@ -88,12 +79,6 @@
     </ClCompile>
     <ClCompile Include="AlgorithmCode\AlgorithmCollection.cpp">
       <Filter>AlgorithmCode</Filter>
-    </ClCompile>
-    <ClCompile Include="CarNumberRemoveCode\ConnectedComponent.cpp">
-      <Filter>AlgorithmCode\NumberRemoveCode</Filter>
-    </ClCompile>
-    <ClCompile Include="CarNumberRemoveCode\LPdetection.cpp">
-      <Filter>AlgorithmCode\NumberRemoveCode</Filter>
     </ClCompile>
     <ClCompile Include="AlgorithmCode\MeanShiftCluster.cpp">
       <Filter>AlgorithmCode</Filter>

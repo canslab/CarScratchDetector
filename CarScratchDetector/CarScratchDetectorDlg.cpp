@@ -100,7 +100,6 @@ HCURSOR CCarScratchDetectorDlg::OnQueryDragIcon()
 	return static_cast<HCURSOR>(m_hIcon);
 }
 
-#pragma optimize("gpsy", off)
 void CCarScratchDetectorDlg::OnBnClickedOpenimagefilebtn()
 {
 	// TODO: Add your control notification handler code here
@@ -120,7 +119,6 @@ void CCarScratchDetectorDlg::OnBnClickedOpenimagefilebtn()
 		auto originalWidth = m_currentMat.cols;
 		auto originalHeight = m_currentMat.rows;
 
-		RemoveNumberPlate(m_currentMat);
 		ResizeImageUsingThreshold(m_currentMat, 100000);
 
 		// If input image exists
@@ -131,7 +129,7 @@ void CCarScratchDetectorDlg::OnBnClickedOpenimagefilebtn()
 			m_imageHeightText.SetWindowTextA(std::to_string(m_currentMat.rows).c_str());
 			GetDlgItem(IDC_OPENIMAGEFILEBTN)->EnableWindow(FALSE);
 			GetDlgItem(IDC_CLEARBTN)->EnableWindow(TRUE);
-			
+
 			// Get current file's name
 			m_currentFileName = dlg.GetFileTitle();
 
@@ -165,7 +163,6 @@ void CCarScratchDetectorDlg::OnBnClickedOpenimagefilebtn()
 		}
 	}
 }
-#pragma optimize("gpsy", on)
 
 void CCarScratchDetectorDlg::OnBnClickedClearbtn()
 {
@@ -186,7 +183,6 @@ void CCarScratchDetectorDlg::OnBnClickedClearbtn()
 	}
 }
 
-#pragma optimize("gpsy", off)
 void CCarScratchDetectorDlg::OnCurrentImageTestButton()
 {
 	if (m_currentMat.data == nullptr && m_currentImageDescriptor.m_totalNumberOfPointsInROI == 0)
@@ -239,10 +235,8 @@ void CCarScratchDetectorDlg::OnCurrentImageTestButton()
 
 	dlg.DoModal();
 }
-#pragma optimize("gpsy", on)
 
 // Load DB Button
-#pragma optimize("gpsy", off)
 void CCarScratchDetectorDlg::OnBnClickedLoaddbbutton()
 {
 	// TODO: Add your control notification handler code here
@@ -309,8 +303,6 @@ void CCarScratchDetectorDlg::OnBnClickedLoaddbbutton()
 		}
 	}
 }
-#pragma optimize("gpsy", on)
-
 
 void CCarScratchDetectorDlg::OnBnClickedTrainingsessionbutton()
 {

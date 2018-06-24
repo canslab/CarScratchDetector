@@ -14,7 +14,7 @@ public:
 	TrainingDialog(CWnd* pParent = NULL);   // standard constructor
 	virtual ~TrainingDialog();
 
-// Dialog Data
+	// Dialog Data
 #ifdef AFX_DESIGN_TIME
 	enum { IDD = IDD_TRAININGDIALOG };
 #endif
