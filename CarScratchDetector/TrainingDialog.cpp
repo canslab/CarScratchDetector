@@ -50,7 +50,6 @@ std::string TrainingDialog::GetImageFileNameFromPath(CString in_path)
 
 BEGIN_MESSAGE_MAP(TrainingDialog, CDialogEx)
 	ON_BN_CLICKED(IDC_OPENIMAGEBUTTON, &TrainingDialog::OnBnClickedOpenimagebutton)
-	ON_BN_CLICKED(IDC_DISCARDBUTTON, &TrainingDialog::OnBnClickedDiscardbutton)
 	ON_BN_CLICKED(IDC_EXPORTBUTTON, &TrainingDialog::OnBnClickedExportbutton)
 END_MESSAGE_MAP()
 
@@ -97,15 +96,8 @@ void TrainingDialog::OnBnClickedOpenimagebutton()
 	// TODO: Add your control notification handler code here
 	GetDlgItem(IDC_STATUSTEXT)->SetWindowTextA("Image 처리 완료");
 	GetDlgItem(IDC_OPENIMAGEBUTTON)->EnableWindow(FALSE);
-	GetDlgItem(IDC_DISCARDBUTTON)->EnableWindow(TRUE);
 }
 
-void TrainingDialog::OnBnClickedDiscardbutton()
-{
-	GetDlgItem(IDC_STATUSTEXT)->SetWindowTextA("기록 삭제완료");
-	m_fileNameList.DeleteAllItems();
-	m_imageDescriptorsMap.clear();
-}
 
 
 void TrainingDialog::OnBnClickedExportbutton()

@@ -205,6 +205,18 @@ void CCarScratchDetectorDlg::OnCurrentImageTestButton()
 	std::map<std::string, double> distanceRecord;
 	for (auto& eachDescriptor : m_loadedImageDescriptorsMap)
 	{
+		// 규모가 큰 클러스터가 입력된 이미지에는 1개 이상인 반면 비교대상인 녀석의 규모가 큰 클러스터는 0개 이면 비교하지 않는다.
+		if (inputImageDescriptor.m_numberOfDenseClusters >= 1 && eachDescriptor.second.m_numberOfDenseClusters == 0)
+		{
+			continue;
+		}
+
+		// 총 포인트 갯수가 50 이상 차이나면 비교하지 않는다.
+		if (std::abs(inputImageDescriptor.m_totalNumberOfPointsInROI - eachDescriptor.second.m_totalNumberOfPointsInROI) >= 100)
+		{
+			continue;
+		}
+
 		auto curScore = ImageDescriptor::CalculateFeatureDistance(inputImageDescriptor, eachDescriptor.second);
 		distanceRecord[eachDescriptor.first] = curScore;
 	}
@@ -227,6 +239,7 @@ void CCarScratchDetectorDlg::OnCurrentImageTestButton()
 	std::string result = "";
 	RankingDialog dlg;
 
+	// 랭킹 다이얼로그에 순위 저장
 	for (auto& element : sortedDistanceSet)
 	{
 		dlg.m_fileNames.push_back(element.first);

@@ -26,7 +26,6 @@ protected:
 	DECLARE_MESSAGE_MAP()
 public:
 	afx_msg void OnBnClickedOpenimagebutton();
-	afx_msg void OnBnClickedDiscardbutton();
 	afx_msg void OnBnClickedExportbutton();
 	virtual BOOL OnInitDialog();
 
