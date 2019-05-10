@@ -1,4 +1,8 @@
-﻿================================================================================
+# CarScratchDetector (SNU Project)
+
+This project aims to find a scratch area in a car body. 
+
+================================================================================
     
 	CarScratchDetector Program Source Code Instructions
 
